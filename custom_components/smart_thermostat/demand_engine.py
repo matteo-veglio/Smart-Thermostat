@@ -1,5 +1,6 @@
 from enum import Enum
 
+from .runtime_context import RuntimeContext
 from .state_machine import ThermostatState
 
 
@@ -10,24 +11,17 @@ class Demand(Enum):
 
 
 class DemandEngine:
-    def evaluate_demand(
-        self,
-        current_temperature: float,
-        heating_target_temperature: float,
-        cooling_target_temperature: float,
-        hysteresis: float,
-        current_state: ThermostatState,
-    ) -> Demand:
-        if current_state == ThermostatState.HEATING:
-            if current_temperature < heating_target_temperature:
+    def evaluate_demand(self, context: RuntimeContext) -> Demand:
+        if context.current_state == ThermostatState.HEATING:
+            if context.current_temperature < context.heating_target_temperature:
                 return Demand.HEATING
-        elif current_temperature <= heating_target_temperature - hysteresis:
+        elif context.current_temperature <= context.heating_target_temperature - context.hysteresis:
             return Demand.HEATING
 
-        if current_state == ThermostatState.COOLING:
-            if current_temperature > cooling_target_temperature:
+        if context.current_state == ThermostatState.COOLING:
+            if context.current_temperature > context.cooling_target_temperature:
                 return Demand.COOLING
-        elif current_temperature >= cooling_target_temperature + hysteresis:
+        elif context.current_temperature >= context.cooling_target_temperature + context.hysteresis:
             return Demand.COOLING
 
         return Demand.NO_DEMAND

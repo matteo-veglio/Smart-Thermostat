@@ -1,4 +1,10 @@
+from __future__ import annotations
+
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .runtime_context import RuntimeContext
 
 
 class HeatingSource(Enum):
@@ -7,12 +13,8 @@ class HeatingSource(Enum):
 
 
 class SourceEngine:
-    def evaluate_source(
-        self,
-        instantaneous_energy_surplus: float,
-        minimum_energy_surplus: float,
-    ) -> HeatingSource:
-        if instantaneous_energy_surplus >= minimum_energy_surplus:
+    def evaluate_source(self, context: RuntimeContext) -> HeatingSource:
+        if context.instantaneous_energy_surplus >= context.minimum_energy_surplus:
             return HeatingSource.AIR_CONDITIONER
 
         return HeatingSource.BOILER
