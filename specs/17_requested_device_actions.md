@@ -2,7 +2,7 @@
 
 ## Requested Device Actions
 
-Version: 1.0
+Version: 1.1
 
 Status: Frozen
 
@@ -67,6 +67,10 @@ Requested Device Actions SHALL be represented as an ordered immutable collection
 
 The order SHALL be preserved during execution.
 
+The collection MAY be empty.
+
+An empty collection explicitly means that the current physical device state already matches the desired system state and therefore no physical device action is required.
+
 ---
 
 # 5. Device Action
@@ -98,7 +102,7 @@ Logical devices are independent from Home Assistant entities.
 
 # 7. Supported Operations
 
-Initially the Smart Thermostat supports the following operations:
+Initially the Smart Thermostat supports the following operations.
 
 ## Boiler
 
@@ -137,7 +141,7 @@ Requested Device Actions represent the desired physical state.
 
 The Thermostat Controller is not responsible for determining whether a command is already applied.
 
-Device Controllers may avoid unnecessary Home Assistant service calls when the requested state is already satisfied.
+Device Controllers may avoid unnecessary Home Assistant service calls when the physical device already satisfies the requested state.
 
 This optimization shall not modify the Requested Device Actions.
 
