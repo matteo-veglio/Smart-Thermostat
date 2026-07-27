@@ -2,7 +2,7 @@
 
 ## Thermostat Controller Workflow
 
-Version: 2.2
+Version: 2.3
 
 Status: Frozen
 
@@ -10,15 +10,13 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines the execution workflow of the Thermostat Controller.
+This document defines the complete evaluation workflow executed by the Thermostat Controller.
 
-The Thermostat Controller is the orchestration component of the Smart Thermostat domain.
+The Thermostat Controller is the only component responsible for evaluating the thermostat.
 
-It coordinates the execution of the domain components.
+The workflow is deterministic.
 
-It contains no business logic.
-
-Every decision is delegated to a specialized component.
+Every evaluation shall always execute the same sequence of steps.
 
 ---
 
@@ -27,209 +25,168 @@ Every decision is delegated to a specialized component.
 The Thermostat Controller SHALL:
 
 - receive a Runtime Context;
-- orchestrate the complete evaluation workflow;
-- invoke the appropriate domain components;
-- update the State Machine;
+- evaluate thermal demand;
+- select the heating source;
+- evaluate all protection rules;
+- determine the requested thermostat state;
+- determine the requested operation;
+- determine the requested climate device target temperature when required;
+- generate the Requested Device Actions;
 - update the Thermostat Runtime State;
-- determine the Current Operation;
-- produce the Thermostat Controller Result;
-- request device actions.
+- return a Thermostat Controller Result.
 
 The Thermostat Controller SHALL NOT:
 
-- read Home Assistant entities;
-- read Config Entry values;
-- evaluate thermal demand;
-- evaluate transition rules;
-- evaluate protection rules;
-- evaluate heating source selection.
+- communicate with Home Assistant;
+- execute Home Assistant services;
+- communicate with physical devices.
 
 ---
 
-# 3. Input
+# 3. Workflow
 
-The Thermostat Controller receives exactly one input.
+The Thermostat Controller SHALL execute the following steps in order.
 
-- Runtime Context
-
-The Runtime Context contains every runtime value required for a single evaluation cycle.
-
----
-
-# 4. Evaluation Workflow
-
-For every evaluation cycle the Thermostat Controller SHALL execute the following sequence.
-
----
-
-## Step 1
+### Step 1
 
 Receive the Runtime Context.
 
----
+### Step 2
 
-## Step 2
+Evaluate the thermal demand.
 
-Invoke the Demand Engine.
+### Step 3
 
-Input:
+Determine the desired heating source.
 
-- Runtime Context
+### Step 4
 
-Output:
+Evaluate all protection rules.
 
-- NO_DEMAND
-- HEATING
-- COOLING
+### Step 5
 
----
+Determine the requested thermostat state.
 
-## Step 3
+### Step 6
 
-If the demand is HEATING:
+Determine the Requested Operation.
 
-Invoke the Source Engine.
+The Requested Operation SHALL be derived exclusively from the Requested Thermostat State.
 
-Input:
+The Requested Operation SHALL be fully determined before any subsequent workflow step is executed.
 
-- Runtime Context
+### Step 7
 
-Output:
+If the Requested Operation requires a Climate Device target temperature, evaluate the Climate Control Table.
 
-- BOILER
-- AIR_CONDITIONER
+The Climate Control Table SHALL receive:
 
-If the demand is not HEATING:
+- Requested Operation;
+- Current Room Temperature;
+- User Heating Target Temperature;
+- User Cooling Target Temperature.
 
-No heating source evaluation is performed.
+The Climate Control Table SHALL return exactly one Climate Device target temperature.
 
----
+If the Requested Operation does not require a Climate Device target temperature, this step shall be skipped.
 
-## Step 4
+### Step 8
 
-Invoke the Transition Table.
+Generate the Requested Device Actions.
 
-Inputs:
+The Requested Device Actions SHALL use:
 
-- Current Thermostat State
-- Current Demand
+- Requested Thermostat State;
+- Requested Operation;
+- Requested Climate Device Target Temperature (when available).
 
-Output:
-
-- Requested Thermostat State
-
-The Thermostat Controller never derives transition rules.
-
----
-
-## Step 5
-
-If a state transition or heating source change requires protection:
-
-Invoke the Protection Engine.
-
-Input:
-
-- Runtime Context
-
-Output:
-
-- ALLOWED
-- DENIED
-
-The Thermostat Controller never evaluates protection rules.
-
----
-
-## Step 6
-
-If the requested transition is authorized:
-
-- update the State Machine.
-
-Otherwise:
-
-- keep the current logical state.
-
----
-
-## Step 7
+### Step 9
 
 Update the Thermostat Runtime State.
 
-The Thermostat Controller SHALL update the Thermostat Runtime State according to:
-
-- specs/15_runtime_state_update_rules.md
-
----
-
-## Step 8
-
-Determine the Current Operation.
-
-Possible values are:
-
-- NONE
-- HEATING
-- COOLING
-
-Current Operation represents the physical operation currently being performed by the thermostat.
-
-It is independent from the logical Thermostat State.
-
----
-
-## Step 9
+### Step 10
 
 Generate the Thermostat Controller Result.
 
-The Thermostat Controller Result is the only output of the Thermostat Controller.
-
-It SHALL contain every evaluation output required by the Home Assistant integration.
-
-At minimum it SHALL contain:
+The Thermostat Controller Result SHALL contain:
 
 - Current Thermostat State;
-- Current Operation;
+- Requested Thermostat State;
 - Current Heating Source;
+- Requested Heating Source;
+- Current Operation;
+- Requested Operation;
+- Protection Result;
 - Requested Device Actions.
 
-The Thermostat Controller Result SHALL be immutable.
+---
+
+# 4. Requested Operation
+
+The Requested Operation represents the operation that the thermostat intends to perform after the current evaluation.
+
+It is derived exclusively from the Requested Thermostat State.
+
+The Requested Operation SHALL NOT be derived by the Climate Control Table.
+
+The Requested Operation SHALL NOT be derived by the Device Action Generation process.
+
+The Requested Operation SHALL be determined exactly once during every evaluation cycle.
 
 ---
 
-# 5. Workflow Principles
+# 5. Climate Control Table
 
-The Thermostat Controller is an orchestrator.
+The Climate Control Table is part of the Thermostat Controller evaluation workflow.
 
-Every decision is delegated.
+It SHALL consume the Requested Operation.
 
-Every persistent runtime update is centralized.
+It SHALL NOT determine the Requested Operation.
 
-The Thermostat Controller is the only component allowed to modify the Thermostat Runtime State.
-
-The Thermostat Controller is the only component responsible for determining the Current Operation.
-
-The Thermostat Controller Result is the only contract between the domain layer and the Home Assistant integration layer.
+It SHALL only determine the requested Climate Device target temperature.
 
 ---
 
-# 6. Error Handling
+# 6. Requested Device Actions
 
-If any domain component raises an exception:
+Requested Device Actions SHALL be generated only after:
 
-- terminate the current evaluation;
-- do not update the State Machine;
-- do not update the Thermostat Runtime State;
-- do not produce a Thermostat Controller Result;
-- do not execute device commands.
+- the Requested Thermostat State has been determined;
+- the Requested Operation has been determined;
+- the Climate Device target temperature has been determined (when required).
 
-Exception handling outside the domain layer is the responsibility of the Home Assistant integration.
+The Requested Device Actions SHALL never perform additional domain evaluations.
 
 ---
 
-# 7. Source of Truth
+# 7. Runtime State Update
 
-This document defines the complete execution workflow of the Thermostat Controller.
+The Thermostat Runtime State SHALL be updated only after all domain decisions have been completed.
 
-Every implementation shall strictly follow this workflow.
+The Runtime State update SHALL never influence the current evaluation cycle.
+
+Its effects apply only to subsequent evaluations.
+
+---
+
+# 8. Result Generation
+
+The Thermostat Controller Result is the only output produced by the Thermostat Controller.
+
+It SHALL completely describe the outcome of the evaluation.
+
+No additional domain information shall be required by downstream components.
+
+---
+
+# 9. Determinism
+
+Given identical Runtime Context values and identical Thermostat Runtime State values, the Thermostat Controller SHALL always produce an identical Thermostat Controller Result.
+
+---
+
+# 10. Source of Truth
+
+This document defines the complete evaluation workflow of the Thermostat Controller.
+
+Every implementation shall strictly follow this specification.
