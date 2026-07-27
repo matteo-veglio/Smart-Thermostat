@@ -2,7 +2,7 @@
 
 ## Climate Control Table
 
-Version: 1.0
+Version: 1.1
 
 Status: Frozen
 
@@ -14,7 +14,7 @@ This document defines how the Smart Thermostat determines the target temperature
 
 The Smart Thermostat shall never send the user target temperature directly to a Climate Device.
 
-Instead, the requested climate target temperature shall be determined using a Climate Control Table.
+Instead, the requested climate target temperature shall be determined using the Climate Control Table.
 
 The Climate Control Table is part of the Smart Thermostat domain.
 
@@ -24,7 +24,7 @@ The Climate Control Table is part of the Smart Thermostat domain.
 
 The Climate Control Table SHALL:
 
-- receive the current operating mode;
+- receive the requested operation;
 - receive the current room temperature;
 - receive the user target temperature;
 - determine the requested Climate Device target temperature.
@@ -42,12 +42,14 @@ The Climate Control Table SHALL NOT:
 
 The Climate Control Table receives:
 
-- Current Operation
+- Requested Operation
 - Current Room Temperature
 - User Heating Target Temperature
 - User Cooling Target Temperature
 
-The appropriate target temperature depends on the current operation.
+The appropriate target temperature SHALL be determined according to the Requested Operation.
+
+The Current Operation SHALL NOT influence the Climate Control Table evaluation.
 
 ---
 
@@ -83,7 +85,7 @@ Exactly one entry SHALL match every temperature error.
 
 # 6. Heating Table
 
-When Current Operation is HEATING, the Heating Table SHALL be used.
+Whenever the Requested Operation is HEATING, the Heating Table SHALL be used.
 
 The Heating Table converts the heating temperature error into the requested Climate Device target temperature.
 
@@ -95,7 +97,7 @@ The evaluation algorithm shall remain identical regardless of the configured val
 
 # 7. Cooling Table
 
-When Current Operation is COOLING, the Cooling Table SHALL be used.
+Whenever the Requested Operation is COOLING, the Cooling Table SHALL be used.
 
 The Cooling Table converts the cooling temperature error into the requested Climate Device target temperature.
 
@@ -109,10 +111,11 @@ The evaluation algorithm shall remain identical regardless of the configured val
 
 For every thermostat evaluation:
 
-1. Calculate the temperature error.
-2. Select the appropriate Climate Control Table.
-3. Find the matching table entry.
-4. Produce exactly one requested Climate Device target temperature.
+1. Determine the Requested Operation.
+2. Select the corresponding Climate Control Table.
+3. Calculate the temperature error.
+4. Find the matching table entry.
+5. Produce exactly one requested Climate Device target temperature.
 
 The evaluation SHALL always produce one deterministic result.
 

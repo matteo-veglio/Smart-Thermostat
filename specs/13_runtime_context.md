@@ -2,7 +2,7 @@
 
 ## Runtime Context
 
-Version: 2.3
+Version: 2.4
 
 Status: Frozen
 
@@ -117,6 +117,31 @@ The Runtime Context shall never modify these values.
 
 ---
 
+## Device State Snapshot
+
+The Runtime Context SHALL include a snapshot of the current physical state of every controlled device.
+
+The Runtime Context Factory SHALL read the current device states from Home Assistant immediately before creating the Runtime Context.
+
+The device state snapshot is the single source of truth for the current physical state of the controlled devices.
+
+Initially the Runtime Context SHALL contain:
+
+- Current Boiler State
+- Current Climate Device State
+
+Additional device state fields may be introduced when support for additional controlled devices is added.
+
+The Runtime Context shall never modify these values.
+
+The Thermostat Controller SHALL use the Device State Snapshot when determining the Requested Device Actions.
+
+The Thermostat Runtime State SHALL NOT be used to infer the current physical state of controlled devices.
+
+The Thermostat Runtime State contains only persistent domain information required across multiple evaluation cycles.
+
+---
+
 ## Protection Configuration
 
 - Current Monotonic Time
@@ -163,12 +188,13 @@ For every thermostat evaluation:
 
 1. The Runtime Context Factory reads Home Assistant data.
 2. The Runtime Context Factory reads the current Thermostat Runtime State.
-3. The Runtime Context Factory creates a new Runtime Context.
-4. The Runtime Context is passed to the Thermostat Controller.
-5. The Thermostat Controller evaluates the Runtime Context.
-6. The Thermostat Controller updates the Thermostat Runtime State if required.
-7. The Thermostat Controller produces a Thermostat Controller Result.
-8. The Runtime Context is discarded.
+3. The Runtime Context Factory reads the current physical state of every controlled device.
+4. The Runtime Context Factory creates a new Runtime Context.
+5. The Runtime Context is passed to the Thermostat Controller.
+6. The Thermostat Controller evaluates the Runtime Context.
+7. The Thermostat Controller updates the Thermostat Runtime State if required.
+8. The Thermostat Controller produces a Thermostat Controller Result.
+9. The Runtime Context is discarded.
 
 A Runtime Context shall never be reused across evaluation cycles.
 
@@ -226,6 +252,8 @@ Domain components shall read only the fields required for their own evaluation.
 Components shall not require optional fields unless explicitly documented.
 
 Persistent runtime information is managed separately by the Thermostat Runtime State.
+
+The current physical state of controlled devices is managed separately through the Device State Snapshot.
 
 Evaluation outputs are managed separately by the Thermostat Controller Result.
 
