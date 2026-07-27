@@ -10,29 +10,16 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
+from homeassistant.const import PRECISION_TENTHS, PRECISION_WHOLE, UnitOfTemperature
 
 PRESET_NIGHT = "night"
 
 
 class SmartThermostatClimateEntity(ClimateEntity):
-    # General
-    _attr_name: str | None = None
-    _attr_unique_id: str | None = None
-    _attr_available: bool = True
-
-    # Temperature
-    _attr_current_temperature: float | None = None
-    _attr_current_humidity: float | None = None
-    _attr_target_temperature_high: float | None = None
-    _attr_target_temperature_low: float | None = None
-
     # HVAC
-    _attr_hvac_mode: HVACMode | None = None
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
-    _attr_hvac_action: HVACAction | None = None
 
     # Presets
-    _attr_preset_mode: str | None = None
     _attr_preset_modes = [PRESET_AWAY, PRESET_HOME, PRESET_NIGHT]
 
     # Supported Features
@@ -43,13 +30,44 @@ class SmartThermostatClimateEntity(ClimateEntity):
         | ClimateEntityFeature.TURN_OFF
     )
 
+    def __init__(self) -> None:
+        # General
+        self._attr_name: str | None = None
+        self._attr_unique_id: str | None = None
+        self._attr_available: bool = True
+
+        # Temperature
+        self._attr_current_temperature: float | None = None
+        self._attr_current_humidity: float | None = None
+        self._attr_target_temperature_high: float | None = None
+        self._attr_target_temperature_low: float | None = None
+
+        # HVAC
+        self._attr_hvac_mode: HVACMode | None = None
+        self._attr_hvac_action: HVACAction | None = None
+
+        # Presets
+        self._attr_preset_mode: str | None = None
+
     @property
     def temperature_unit(self) -> str:
         return self.hass.config.units.temperature_unit
 
+    @property
+    def precision(self) -> float:
+        if self.temperature_unit == UnitOfTemperature.CELSIUS:
+            return PRECISION_TENTHS
+        return PRECISION_WHOLE
+
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         self._attr_hvac_mode = hvac_mode
         self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        await self.async_set_hvac_mode(HVACMode.HEAT_COOL)
+
+    async def async_turn_off(self) -> None:
+        await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         self._attr_preset_mode = preset_mode
