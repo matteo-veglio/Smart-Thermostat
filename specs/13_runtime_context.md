@@ -2,7 +2,7 @@
 
 ## Runtime Context
 
-Version: 2.4
+Version: 2.5
 
 Status: Frozen
 
@@ -127,8 +127,15 @@ The device state snapshot is the single source of truth for the current physical
 
 Initially the Runtime Context SHALL contain:
 
-- Current Boiler State
-- Current Climate Device State
+### Boiler
+
+- Current Boiler Power State
+
+### Climate Device
+
+- Current Climate Power State
+- Current Climate HVAC Mode
+- Current Climate Target Temperature
 
 Additional device state fields may be introduced when support for additional controlled devices is added.
 
