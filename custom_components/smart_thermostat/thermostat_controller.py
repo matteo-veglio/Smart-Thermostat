@@ -53,10 +53,10 @@ class ThermostatController:
         self._runtime_state = runtime_state
         self._climate_control_table = climate_control_table
 
-    def evaluate(self, context: RuntimeContext) -> ThermostatControllerResult:
+    def evaluate(self, context: RuntimeContext, *, enabled: bool = True) -> ThermostatControllerResult:
         current_state = context.current_state
 
-        demand = self._demand_engine.evaluate_demand(context)
+        demand = self._demand_engine.evaluate_demand(context) if enabled else Demand.NO_DEMAND
 
         protection_result: Permission | None = None
         requested_heating_source: HeatingSource | None = None
@@ -94,6 +94,10 @@ class ThermostatController:
                     device_stopped = True
             else:
                 self._state_machine.transition_to(requested_state)
+
+        # specs/21_external_state_transitions.md §4 Disabling the Thermostat
+        if not enabled and self._state_machine.current_state == ThermostatState.IDLE:
+            self._state_machine.transition_to(ThermostatState.OFF)
 
         effective_state = self._state_machine.current_state
 

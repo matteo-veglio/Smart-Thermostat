@@ -40,7 +40,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
             selector.EntitySelectorConfig(domain="sensor")
         ),
         vol.Required(CONF_MINIMUM_ENERGY_SURPLUS): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="number")
+            selector.EntitySelectorConfig(domain=["number","input_number",])
         ),
         vol.Required(CONF_THERMOSTAT_TOLERANCE): selector.NumberSelector(
             selector.NumberSelectorConfig(

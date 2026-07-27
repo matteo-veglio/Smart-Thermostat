@@ -28,17 +28,29 @@ The preferred heating source is selected automatically according to the availabl
 The thermostat supports the following HVAC modes:
 
 - OFF
-- HEAT
-- COOL
-- AUTO
+- HEAT_COOL
 
 The thermostat shall always operate in exactly one HVAC mode.
+
+OFF disables the thermostat.
+
+While the thermostat is OFF:
+
+- no thermal demand shall be evaluated;
+- no Requested Device Actions shall be generated;
+- the Thermostat State shall remain OFF.
+
+HEAT_COOL enables the thermostat.
+
+When enabled, the thermostat shall operate according to the normal Thermostat Controller workflow.
+
+The Thermostat Controller shall automatically determine whether heating or cooling is required.
 
 ---
 
 # 3. Heating
 
-When HVAC mode is HEAT or AUTO, the thermostat may request heating.
+When the thermostat is enabled, it may request heating.
 
 Heating demand is determined exclusively by the Demand Engine.
 
@@ -48,7 +60,7 @@ The heating source is selected by the Source Engine.
 
 # 4. Cooling
 
-When HVAC mode is COOL or AUTO, the thermostat may request cooling.
+When the thermostat is enabled, it may request cooling.
 
 Cooling demand is determined exclusively by the Demand Engine.
 

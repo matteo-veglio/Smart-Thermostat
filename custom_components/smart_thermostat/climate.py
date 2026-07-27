@@ -12,13 +12,25 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfTemperature
+from homeassistant.const import (
+    ATTR_TEMPERATURE,
+    CONF_NAME,
+    PRECISION_TENTHS,
+    PRECISION_WHOLE,
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .boiler_controller import BoilerController
 from .climate_controller import ClimateController
 from .config_flow import (
+    CONF_HEATING_SOURCE_1,
+    CONF_HEATING_SOURCE_2,
     CONF_INDOOR_HUMIDITY_SENSOR,
     CONF_INDOOR_TEMPERATURE_SENSOR,
     CONF_INSTANTANEOUS_ENERGY_SURPLUS,
@@ -32,6 +44,7 @@ from .config_flow import (
 from .device_action import (
     ClimateHVACMode,
     DeviceAction,
+    PowerState,
     SetClimateHVACMode,
     SetClimateTargetTemperature,
     TurnBoilerOff,
@@ -82,6 +95,8 @@ async def async_setup_entry(
                 boiler_controller=entry.runtime_data.boiler_controller,
                 heating_climate_controller=entry.runtime_data.heating_climate_controller,
                 cooling_climate_controller=entry.runtime_data.cooling_climate_controller,
+                boiler_entity_id=entry.data[CONF_HEATING_SOURCE_1],
+                climate_entity_id=entry.data[CONF_HEATING_SOURCE_2],
                 unique_id=entry.entry_id,
                 name=entry.data[CONF_NAME],
                 indoor_temperature_sensor_entity_id=entry.data[CONF_INDOOR_TEMPERATURE_SENSOR],
@@ -121,6 +136,8 @@ class SmartThermostatClimateEntity(ClimateEntity):
         boiler_controller: BoilerController,
         heating_climate_controller: ClimateController,
         cooling_climate_controller: ClimateController,
+        boiler_entity_id: str,
+        climate_entity_id: str,
         unique_id: str,
         name: str,
         indoor_temperature_sensor_entity_id: str,
@@ -139,6 +156,8 @@ class SmartThermostatClimateEntity(ClimateEntity):
         self._boiler_controller = boiler_controller
         self._heating_climate_controller = heating_climate_controller
         self._cooling_climate_controller = cooling_climate_controller
+        self._boiler_entity_id = boiler_entity_id
+        self._climate_entity_id = climate_entity_id
 
         self._indoor_temperature_sensor_entity_id = indoor_temperature_sensor_entity_id
         self._indoor_humidity_sensor_entity_id = indoor_humidity_sensor_entity_id
@@ -179,6 +198,10 @@ class SmartThermostatClimateEntity(ClimateEntity):
         return PRECISION_WHOLE
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        # specs/21_external_state_transitions.md §3 Enabling the Thermostat
+        if hvac_mode == HVACMode.HEAT_COOL and self._state_machine.current_state == ThermostatState.OFF:
+            self._state_machine.transition_to(ThermostatState.IDLE)
+
         self._attr_hvac_mode = hvac_mode
         self.async_write_ha_state()
 
@@ -218,12 +241,60 @@ class SmartThermostatClimateEntity(ClimateEntity):
 
         return self._read_required_value(entity_id)
 
+    def _read_boiler_power_state(self, entity_id: str) -> PowerState | None:
+        state = self.hass.states.get(entity_id)
+
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+
+        if state.state == STATE_ON:
+            return PowerState.ON
+
+        if state.state == STATE_OFF:
+            return PowerState.OFF
+
+        return None
+
+    def _read_climate_device_snapshot(
+        self, entity_id: str
+    ) -> tuple[PowerState, ClimateHVACMode, float] | None:
+        state = self.hass.states.get(entity_id)
+
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+
+        if state.state == HVACMode.OFF:
+            power_state = PowerState.OFF
+            hvac_mode = ClimateHVACMode.HEAT
+        elif state.state == HVACMode.HEAT:
+            power_state = PowerState.ON
+            hvac_mode = ClimateHVACMode.HEAT
+        elif state.state == HVACMode.COOL:
+            power_state = PowerState.ON
+            hvac_mode = ClimateHVACMode.COOL
+        else:
+            return None
+
+        target_temperature = state.attributes.get(ATTR_TEMPERATURE)
+
+        if target_temperature is None:
+            return None
+
+        try:
+            target_temperature = float(target_temperature)
+        except (TypeError, ValueError):
+            return None
+
+        return power_state, hvac_mode, target_temperature
+
     async def async_evaluate(self) -> None:
         current_temperature = self._read_required_value(self._indoor_temperature_sensor_entity_id)
         instantaneous_energy_surplus = self._read_required_value(self._instantaneous_energy_surplus_entity_id)
         minimum_energy_surplus = self._read_required_value(self._minimum_energy_surplus_entity_id)
         heating_target_temperature = self._attr_target_temperature_low
         cooling_target_temperature = self._attr_target_temperature_high
+        current_boiler_power_state = self._read_boiler_power_state(self._boiler_entity_id)
+        climate_device_snapshot = self._read_climate_device_snapshot(self._climate_entity_id)
 
         if (
             current_temperature is None
@@ -231,10 +302,18 @@ class SmartThermostatClimateEntity(ClimateEntity):
             or minimum_energy_surplus is None
             or heating_target_temperature is None
             or cooling_target_temperature is None
+            or current_boiler_power_state is None
+            or climate_device_snapshot is None
         ):
             self._attr_available = False
             self.async_write_ha_state()
             return
+
+        (
+            current_climate_power_state,
+            current_climate_hvac_mode,
+            current_climate_target_temperature,
+        ) = climate_device_snapshot
 
         current_humidity = self._read_optional_value(self._indoor_humidity_sensor_entity_id)
 
@@ -252,9 +331,13 @@ class SmartThermostatClimateEntity(ClimateEntity):
             minimum_source_runtime=self._minimum_source_runtime,
             shutdown_delay=self._shutdown_delay,
             source_change_delay=self._source_change_delay,
+            current_boiler_power_state=current_boiler_power_state,
+            current_climate_power_state=current_climate_power_state,
+            current_climate_hvac_mode=current_climate_hvac_mode,
+            current_climate_target_temperature=current_climate_target_temperature,
         )
 
-        result = self._thermostat_controller.evaluate(context)
+        result = self._thermostat_controller.evaluate(context, enabled=self._attr_hvac_mode != HVACMode.OFF)
 
         self._attr_available = True
         self._attr_current_temperature = current_temperature
