@@ -16,6 +16,8 @@ from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, ST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .boiler_controller import BoilerController
+from .climate_controller import ClimateController
 from .config_flow import (
     CONF_INDOOR_HUMIDITY_SENSOR,
     CONF_INDOOR_TEMPERATURE_SENSOR,
@@ -27,10 +29,20 @@ from .config_flow import (
     CONF_SOURCE_CHANGE_DELAY,
     CONF_THERMOSTAT_TOLERANCE,
 )
+from .device_action import (
+    ClimateHVACMode,
+    DeviceAction,
+    SetClimateHVACMode,
+    SetClimateTargetTemperature,
+    TurnBoilerOff,
+    TurnBoilerOn,
+    TurnClimateOff,
+    TurnClimateOn,
+)
 from .runtime_context_factory import RuntimeContextFactory
 from .runtime_data import SmartThermostatConfigEntry
 from .state_machine import StateMachine, ThermostatState
-from .thermostat_controller import ThermostatController
+from .thermostat_controller import ThermostatController, ThermostatControllerResult
 from .thermostat_runtime_state import CurrentOperation
 
 PRESET_NIGHT = "night"
@@ -44,6 +56,11 @@ _HVAC_ACTION_MAP: dict[tuple[ThermostatState, CurrentOperation], HVACAction] = {
     (ThermostatState.COOLING, CurrentOperation.COOLING): HVACAction.COOLING,
     (ThermostatState.STOPPING, CurrentOperation.HEATING): HVACAction.HEATING,
     (ThermostatState.STOPPING, CurrentOperation.COOLING): HVACAction.COOLING,
+}
+
+_CLIMATE_HVAC_MODE_MAP: dict[ClimateHVACMode, HVACMode] = {
+    ClimateHVACMode.HEAT: HVACMode.HEAT,
+    ClimateHVACMode.COOL: HVACMode.COOL,
 }
 
 
@@ -62,6 +79,9 @@ async def async_setup_entry(
                 thermostat_controller=entry.runtime_data.thermostat_controller,
                 runtime_context_factory=entry.runtime_data.runtime_context_factory,
                 state_machine=entry.runtime_data.state_machine,
+                boiler_controller=entry.runtime_data.boiler_controller,
+                heating_climate_controller=entry.runtime_data.heating_climate_controller,
+                cooling_climate_controller=entry.runtime_data.cooling_climate_controller,
                 unique_id=entry.entry_id,
                 name=entry.data[CONF_NAME],
                 indoor_temperature_sensor_entity_id=entry.data[CONF_INDOOR_TEMPERATURE_SENSOR],
@@ -98,6 +118,9 @@ class SmartThermostatClimateEntity(ClimateEntity):
         thermostat_controller: ThermostatController,
         runtime_context_factory: RuntimeContextFactory,
         state_machine: StateMachine,
+        boiler_controller: BoilerController,
+        heating_climate_controller: ClimateController,
+        cooling_climate_controller: ClimateController,
         unique_id: str,
         name: str,
         indoor_temperature_sensor_entity_id: str,
@@ -113,6 +136,9 @@ class SmartThermostatClimateEntity(ClimateEntity):
         self._thermostat_controller = thermostat_controller
         self._runtime_context_factory = runtime_context_factory
         self._state_machine = state_machine
+        self._boiler_controller = boiler_controller
+        self._heating_climate_controller = heating_climate_controller
+        self._cooling_climate_controller = cooling_climate_controller
 
         self._indoor_temperature_sensor_entity_id = indoor_temperature_sensor_entity_id
         self._indoor_humidity_sensor_entity_id = indoor_humidity_sensor_entity_id
@@ -236,3 +262,35 @@ class SmartThermostatClimateEntity(ClimateEntity):
         self._attr_hvac_action = _HVAC_ACTION_MAP[(result.current_state, result.current_operation)]
 
         self.async_write_ha_state()
+
+        await self._async_execute_requested_device_actions(result)
+
+    def _select_climate_controller(self, requested_operation: CurrentOperation) -> ClimateController:
+        if requested_operation == CurrentOperation.COOLING:
+            return self._cooling_climate_controller
+
+        return self._heating_climate_controller
+
+    async def _async_execute_requested_device_actions(self, result: ThermostatControllerResult) -> None:
+        climate_controller = self._select_climate_controller(result.requested_operation)
+
+        for action in result.requested_device_actions:
+            await self._async_execute_device_action(action, climate_controller)
+
+    async def _async_execute_device_action(
+        self,
+        action: DeviceAction,
+        climate_controller: ClimateController,
+    ) -> None:
+        if isinstance(action, TurnBoilerOn):
+            await self._boiler_controller.turn_on()
+        elif isinstance(action, TurnBoilerOff):
+            await self._boiler_controller.turn_off()
+        elif isinstance(action, TurnClimateOn):
+            await climate_controller.turn_on()
+        elif isinstance(action, TurnClimateOff):
+            await climate_controller.turn_off()
+        elif isinstance(action, SetClimateHVACMode):
+            await climate_controller.set_hvac_mode(_CLIMATE_HVAC_MODE_MAP[action.hvac_mode])
+        elif isinstance(action, SetClimateTargetTemperature):
+            await climate_controller.set_target_temperature(action.target_temperature)
