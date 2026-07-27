@@ -12,6 +12,11 @@ CONF_HEATING_SOURCE_2 = "heating_source_2"
 CONF_COOLING_SOURCE = "cooling_source"
 CONF_INSTANTANEOUS_ENERGY_SURPLUS = "instantaneous_energy_surplus"
 CONF_MINIMUM_ENERGY_SURPLUS = "minimum_energy_surplus"
+CONF_THERMOSTAT_TOLERANCE = "thermostat_tolerance"
+CONF_SHUTDOWN_DELAY = "shutdown_delay"
+CONF_SOURCE_CHANGE_DELAY = "source_change_delay"
+CONF_MINIMUM_DEVICE_RUNTIME = "minimum_device_runtime"
+CONF_MINIMUM_SOURCE_RUNTIME = "minimum_source_runtime"
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -37,6 +42,17 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_MINIMUM_ENERGY_SURPLUS): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="number")
         ),
+        vol.Required(CONF_THERMOSTAT_TOLERANCE): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement="°C",
+                step="any",
+            )
+        ),
+        vol.Required(CONF_SHUTDOWN_DELAY): selector.DurationSelector(),
+        vol.Required(CONF_SOURCE_CHANGE_DELAY): selector.DurationSelector(),
+        vol.Required(CONF_MINIMUM_DEVICE_RUNTIME): selector.DurationSelector(),
+        vol.Required(CONF_MINIMUM_SOURCE_RUNTIME): selector.DurationSelector(),
     }
 )
 
