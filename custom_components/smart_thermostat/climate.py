@@ -10,9 +10,30 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import PRECISION_TENTHS, PRECISION_WHOLE, UnitOfTemperature
+from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, UnitOfTemperature
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .runtime_data import SmartThermostatConfigEntry
+from .thermostat_controller import ThermostatController
 
 PRESET_NIGHT = "night"
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: SmartThermostatConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    async_add_entities(
+        [
+            SmartThermostatClimateEntity(
+                thermostat_controller=entry.runtime_data.thermostat_controller,
+                unique_id=entry.entry_id,
+                name=entry.data[CONF_NAME],
+            )
+        ]
+    )
 
 
 class SmartThermostatClimateEntity(ClimateEntity):
@@ -30,10 +51,17 @@ class SmartThermostatClimateEntity(ClimateEntity):
         | ClimateEntityFeature.TURN_OFF
     )
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        thermostat_controller: ThermostatController,
+        unique_id: str,
+        name: str,
+    ) -> None:
+        self._thermostat_controller = thermostat_controller
+
         # General
-        self._attr_name: str | None = None
-        self._attr_unique_id: str | None = None
+        self._attr_name: str | None = name
+        self._attr_unique_id: str | None = unique_id
         self._attr_available: bool = True
 
         # Temperature
