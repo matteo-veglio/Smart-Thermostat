@@ -10,6 +10,8 @@ CONF_INDOOR_HUMIDITY_SENSOR = "indoor_humidity_sensor"
 CONF_HEATING_SOURCE_1 = "heating_source_1"
 CONF_HEATING_SOURCE_2 = "heating_source_2"
 CONF_COOLING_SOURCE = "cooling_source"
+CONF_INSTANTANEOUS_ENERGY_SURPLUS = "instantaneous_energy_surplus"
+CONF_MINIMUM_ENERGY_SURPLUS = "minimum_energy_surplus"
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -28,6 +30,12 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         ),
         vol.Required(CONF_COOLING_SOURCE): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="climate")
+        ),
+        vol.Required(CONF_INSTANTANEOUS_ENERGY_SURPLUS): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="sensor")
+        ),
+        vol.Required(CONF_MINIMUM_ENERGY_SURPLUS): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="number")
         ),
     }
 )
