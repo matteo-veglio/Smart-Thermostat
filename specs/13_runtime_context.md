@@ -2,7 +2,7 @@
 
 ## Runtime Context
 
-Version: 1.0
+Version: 2.0
 
 Status: Frozen
 
@@ -12,7 +12,7 @@ Status: Frozen
 
 This document defines the Runtime Context used by the Thermostat Controller.
 
-The Runtime Context is a read-only data object that contains every runtime value required to evaluate the thermostat.
+The Runtime Context is an immutable snapshot containing every runtime value required to evaluate the thermostat during a single evaluation cycle.
 
 It exists to decouple the domain layer from Home Assistant.
 
@@ -37,7 +37,8 @@ The Runtime Context SHALL NOT:
 - evaluate transition rules;
 - evaluate protection rules;
 - select heating sources;
-- communicate with Home Assistant.
+- communicate with Home Assistant;
+- own persistent runtime information.
 
 ---
 
@@ -49,7 +50,7 @@ The Runtime Context Factory is responsible for collecting runtime information fr
 
 - Home Assistant entities;
 - Config Entry values;
-- runtime state maintained by the integration.
+- the Thermostat Runtime State.
 
 The Runtime Context Factory performs no business logic.
 
@@ -64,12 +65,6 @@ The Runtime Context SHALL contain the following information.
 ## Thermostat State
 
 - Current Thermostat State
-
----
-
-## Heating Source
-
-- Current Heating Source
 
 ---
 
@@ -95,18 +90,25 @@ The Runtime Context SHALL contain the following information.
 
 ---
 
-## Protection Timing
+## Runtime State Snapshot
 
-- Current Monotonic Time
+The Runtime Context SHALL include a snapshot of the current Thermostat Runtime State.
+
+This snapshot contains:
+
+- Current Heating Source
 - Device Started At
 - Demand Ended At
 - Source Selected At
 - Desired Source Differs Since
 
+The Runtime Context shall never modify these values.
+
 ---
 
 ## Protection Configuration
 
+- Current Monotonic Time
 - Minimum Device Runtime
 - Minimum Source Runtime
 - Shutdown Delay
@@ -118,10 +120,13 @@ The Runtime Context SHALL contain the following information.
 
 For every thermostat evaluation:
 
-1. The Runtime Context Factory creates a new Runtime Context.
-2. The Runtime Context is passed to the Thermostat Controller.
-3. The Thermostat Controller evaluates the complete control workflow.
-4. The Runtime Context is discarded.
+1. The Runtime Context Factory reads Home Assistant data.
+2. The Runtime Context Factory reads the current Thermostat Runtime State.
+3. The Runtime Context Factory creates a new Runtime Context.
+4. The Runtime Context is passed to the Thermostat Controller.
+5. The Thermostat Controller evaluates the Runtime Context.
+6. The Thermostat Controller updates the Thermostat Runtime State if required.
+7. The Runtime Context is discarded.
 
 A Runtime Context shall never be reused across evaluation cycles.
 
@@ -135,17 +140,25 @@ No component may modify its contents after creation.
 
 If runtime information changes, a new Runtime Context shall be created.
 
+Persistent runtime information belongs exclusively to the Thermostat Runtime State.
+
 ---
 
 # 7. Dependencies
 
-The Runtime Context depends on no other domain component.
+The Runtime Context depends on no domain component.
 
-The following components consume the Runtime Context:
+The Runtime Context Factory may read:
+
+- Home Assistant
+- Config Entry
+- Thermostat Runtime State
+
+The following domain component consumes the Runtime Context:
 
 - Thermostat Controller
 
-No other component shall require direct access to Home Assistant runtime data.
+No other domain component shall retrieve information directly from Home Assistant.
 
 ---
 
@@ -153,13 +166,16 @@ No other component shall require direct access to Home Assistant runtime data.
 
 The Runtime Context is a Data Transfer Object (DTO).
 
-Its purpose is transporting runtime data between the Home Assistant integration layer and the domain layer.
+Its purpose is transporting all runtime information required for a single evaluation cycle.
 
-It intentionally contains:
+The Runtime Context intentionally contains:
 
 - no behaviour;
 - no calculations;
-- no decision logic.
+- no decision logic;
+- no mutable runtime state.
+
+Persistent runtime information is managed separately by the Thermostat Runtime State.
 
 ---
 
