@@ -2,7 +2,7 @@
 
 ## Software Architecture
 
-Version: 2.0
+Version: 2.1
 
 Status: Frozen
 
@@ -63,10 +63,15 @@ Responsible for:
 
 - orchestrating the complete thermostat operation;
 - coordinating all internal engines;
-- updating the Climate Entity;
-- dispatching commands to the Device Controllers.
+- reading the current thermostat state;
+- requesting thermal demand evaluation;
+- requesting heating source selection;
+- requesting protection evaluation;
+- requesting state transitions;
+- requesting device actions;
+- producing the orchestration result.
 
-The Thermostat Controller contains no decision logic of its own.
+The Thermostat Controller contains no business logic of its own.
 
 It delegates every decision to the appropriate engine.
 
@@ -76,7 +81,7 @@ It delegates every decision to the appropriate engine.
 
 Responsible only for the logical operating state of the thermostat.
 
-It knows:
+It knows only:
 
 - OFF
 - IDLE
@@ -96,9 +101,17 @@ It never knows:
 
 ## Demand Engine
 
-Responsible for determining the thermal demand.
+Responsible only for determining the current thermal demand.
 
-Possible outputs:
+Inputs:
+
+- current room temperature;
+- heating target temperature;
+- cooling target temperature;
+- thermostat hysteresis;
+- current thermostat state.
+
+Outputs:
 
 - NO_DEMAND
 - HEATING
@@ -110,19 +123,17 @@ It never selects the heating source.
 
 ## Source Engine
 
-Responsible for selecting the heating source.
+Responsible only for selecting the preferred heating source.
 
-Possible outputs:
+Inputs:
 
-- NONE
+- instantaneous energy surplus;
+- minimum energy surplus.
+
+Outputs:
+
 - BOILER
-- AIR_CONDITIONER
-
-The decision is based on:
-
-- instantaneous surplus;
-- minimum surplus;
-- protection constraints.
+- AIR_CONDITIONER.
 
 It never evaluates thermal demand.
 
@@ -130,7 +141,7 @@ It never evaluates thermal demand.
 
 ## Protection Engine
 
-Responsible for protecting the system.
+Responsible only for evaluating timing constraints.
 
 It evaluates:
 
@@ -139,9 +150,14 @@ It evaluates:
 - minimum device runtime;
 - minimum source runtime.
 
-It never evaluates demand.
+The Protection Engine never decides what should happen.
 
-It never selects the source.
+It only determines whether the requested operation is currently allowed.
+
+Possible outputs:
+
+- ALLOWED
+- DENIED
 
 ---
 
@@ -160,16 +176,18 @@ No decision logic exists inside Device Controllers.
 
 # 4. Information Flow
 
-The execution flow is:
+For every evaluation cycle:
 
-1. Climate Entity receives a user command.
-2. Thermostat Controller requests the current demand from the Demand Engine.
-3. Demand Engine determines whether heating, cooling or no demand exists.
-4. If heating is required, the Thermostat Controller asks the Source Engine to select the heating source.
-5. The Protection Engine validates whether the requested transition is currently allowed.
-6. The State Machine updates the logical operating state.
-7. The Thermostat Controller dispatches commands to the appropriate Device Controller.
-8. The Climate Entity is updated with the new state.
+1. The Thermostat Controller reads the current logical thermostat state.
+2. The Demand Engine evaluates the current thermal demand.
+3. If heating is required, the Source Engine selects the preferred heating source.
+4. If a heating source change is required, the Thermostat Controller invokes the Protection Engine according to `specs/12_controller_protection_workflow.md`.
+5. The Thermostat Controller determines the requested logical state according to `specs/11_controller_transition_table.md`.
+6. If a state transition is required, the Thermostat Controller invokes the Protection Engine according to `specs/12_controller_protection_workflow.md`.
+7. If authorized, the State Machine performs the requested transition.
+8. The Thermostat Controller generates the orchestration result.
+9. Device Controllers execute the requested actions.
+10. The Climate Entity is updated.
 
 ---
 
@@ -181,9 +199,13 @@ Components communicate only through well-defined interfaces.
 
 No component shall duplicate another component's responsibility.
 
+The Thermostat Controller is the only component allowed to coordinate multiple engines.
+
 The State Machine shall never contain source selection logic.
 
 The Source Engine shall never contain thermostat state logic.
+
+The Protection Engine shall never perform state transitions.
 
 ---
 
