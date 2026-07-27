@@ -2,7 +2,7 @@
 
 ## Thermostat Controller Workflow
 
-Version: 2.0
+Version: 2.2
 
 Status: Frozen
 
@@ -31,8 +31,9 @@ The Thermostat Controller SHALL:
 - invoke the appropriate domain components;
 - update the State Machine;
 - update the Thermostat Runtime State;
-- request device actions;
-- produce the evaluation result.
+- determine the Current Operation;
+- produce the Thermostat Controller Result;
+- request device actions.
 
 The Thermostat Controller SHALL NOT:
 
@@ -51,7 +52,7 @@ The Thermostat Controller receives exactly one input.
 
 - Runtime Context
 
-The Runtime Context contains every runtime value required for one evaluation cycle.
+The Runtime Context contains every runtime value required for a single evaluation cycle.
 
 ---
 
@@ -144,11 +145,11 @@ The Thermostat Controller never evaluates protection rules.
 
 If the requested transition is authorized:
 
-Update the State Machine.
+- update the State Machine.
 
-If authorization is denied:
+Otherwise:
 
-Keep the current logical state.
+- keep the current logical state.
 
 ---
 
@@ -156,25 +157,44 @@ Keep the current logical state.
 
 Update the Thermostat Runtime State.
 
-The Thermostat Controller SHALL update every persistent runtime field whose value changed during the evaluation.
+The Thermostat Controller SHALL update the Thermostat Runtime State according to:
 
-Typical updates include:
-
-- Current Heating Source
-- Device Started At
-- Demand Ended At
-- Source Selected At
-- Desired Source Differs Since
-
-The Thermostat Runtime State shall always represent the current persistent runtime information after the evaluation completes.
+- specs/15_runtime_state_update_rules.md
 
 ---
 
 ## Step 8
 
+Determine the Current Operation.
+
+Possible values are:
+
+- NONE
+- HEATING
+- COOLING
+
+Current Operation represents the physical operation currently being performed by the thermostat.
+
+It is independent from the logical Thermostat State.
+
+---
+
+## Step 9
+
 Generate the Thermostat Controller Result.
 
-The result SHALL contain only the information required by the Home Assistant integration layer.
+The Thermostat Controller Result is the only output of the Thermostat Controller.
+
+It SHALL contain every evaluation output required by the Home Assistant integration.
+
+At minimum it SHALL contain:
+
+- Current Thermostat State;
+- Current Operation;
+- Current Heating Source;
+- Requested Device Actions.
+
+The Thermostat Controller Result SHALL be immutable.
 
 ---
 
@@ -188,6 +208,10 @@ Every persistent runtime update is centralized.
 
 The Thermostat Controller is the only component allowed to modify the Thermostat Runtime State.
 
+The Thermostat Controller is the only component responsible for determining the Current Operation.
+
+The Thermostat Controller Result is the only contract between the domain layer and the Home Assistant integration layer.
+
 ---
 
 # 6. Error Handling
@@ -197,6 +221,7 @@ If any domain component raises an exception:
 - terminate the current evaluation;
 - do not update the State Machine;
 - do not update the Thermostat Runtime State;
+- do not produce a Thermostat Controller Result;
 - do not execute device commands.
 
 Exception handling outside the domain layer is the responsibility of the Home Assistant integration.

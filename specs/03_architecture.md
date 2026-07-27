@@ -2,7 +2,7 @@
 
 ## Software Architecture
 
-Version: 2.3
+Version: 2.4
 
 Status: Frozen
 
@@ -18,7 +18,7 @@ Business logic is distributed across specialized domain components.
 
 The Home Assistant integration layer is responsible for collecting runtime information and translating it into a Runtime Context.
 
-The domain layer is responsible for evaluating the thermostat behaviour and maintaining its persistent runtime state.
+The domain layer is responsible for evaluating the thermostat behaviour, maintaining its persistent runtime state and producing the Thermostat Controller Result.
 
 ---
 
@@ -39,22 +39,24 @@ The domain layer is responsible for evaluating the thermostat behaviour and main
                            ▼
                 Thermostat Controller
                            │
-         ┌─────────────────┴─────────────────┐
-         ▼                                   ▼
- Thermostat Runtime State             Domain Components
- (persistent state)              ┌────────┬────────┬────────┬────────┐
-                                 ▼        ▼        ▼        ▼
-                           State Machine Demand  Source  Protection
-                                         Engine  Engine   Engine
-                                                   │
-                                                   ▼
-                                           Transition Table
-                                                   │
-                                                   ▼
-                                           Device Controllers
-                                                   │
-                                                   ▼
-                                     Boiler / Air Conditioner
+        ┌──────────────────┴──────────────────┐
+        ▼                                     ▼
+Thermostat Runtime State          Thermostat Controller Result
+ (persistent state)                     (evaluation output)
+        │
+        ▼
+ ┌──────────────┬──────────────┬──────────────┬─────────────────┐
+ ▼              ▼              ▼              ▼
+State Machine Demand Engine Source Engine Protection Engine
+                       │
+                       ▼
+                Transition Table
+                       │
+                       ▼
+               Device Controllers
+                       │
+                       ▼
+          Boiler / Air Conditioner
 ```
 
 ---
@@ -67,7 +69,9 @@ Responsible for:
 
 - exposing the Home Assistant Climate interface;
 - receiving user commands;
-- requesting thermostat evaluations.
+- collecting runtime information;
+- requesting thermostat evaluations;
+- translating the Thermostat Controller Result into Home Assistant attributes.
 
 The Climate Entity shall never implement thermostat logic.
 
@@ -95,7 +99,8 @@ The Runtime Context:
 - is immutable;
 - exists only for one evaluation cycle;
 - contains no behaviour;
-- contains no business logic.
+- contains no business logic;
+- contains only evaluation inputs.
 
 ---
 
@@ -105,11 +110,30 @@ Responsible for:
 
 - orchestrating the complete domain evaluation;
 - coordinating every domain component;
+- updating the State Machine;
 - updating the Thermostat Runtime State;
+- determining the Current Operation;
 - requesting device actions;
-- producing the orchestration result.
+- producing the Thermostat Controller Result.
 
 The Thermostat Controller contains no business logic of its own.
+
+---
+
+## Thermostat Controller Result
+
+Responsible for exposing the evaluation outputs required by the Home Assistant integration.
+
+It contains evaluation outputs only.
+
+Typical information includes:
+
+- Current Thermostat State;
+- Current Operation;
+- Current Heating Source;
+- Requested Device Actions.
+
+The Thermostat Controller Result is immutable.
 
 ---
 
@@ -121,17 +145,16 @@ The Thermostat Runtime State:
 
 - survives between evaluation cycles;
 - contains mutable runtime information;
-- is owned exclusively by the Thermostat Controller.
-
-No other component may modify it.
+- is owned by the integration;
+- is modified exclusively by the Thermostat Controller.
 
 ---
 
 ## State Machine
 
-Responsible only for the logical operating state.
+Responsible only for maintaining the logical thermostat state.
 
-The State Machine stores only:
+Possible logical states are:
 
 - OFF
 - IDLE
@@ -211,15 +234,15 @@ They never make decisions.
 
 For every evaluation cycle:
 
-1. The Climate Entity requests a thermostat evaluation.
+1. The Climate Entity collects runtime information.
 2. The Runtime Context Factory reads Home Assistant runtime data.
 3. The Runtime Context Factory reads the Thermostat Runtime State.
 4. The Runtime Context Factory creates a Runtime Context.
 5. The Thermostat Controller evaluates the Runtime Context.
 6. The Thermostat Controller updates the Thermostat Runtime State if necessary.
-7. The State Machine is updated if required.
-8. Device Controllers execute the requested actions.
-9. The Climate Entity updates the Home Assistant entity state.
+7. The Thermostat Controller produces a Thermostat Controller Result.
+8. The Climate Entity updates its Home Assistant state from the Thermostat Controller Result.
+9. Device Controllers execute the requested actions when required.
 
 ---
 
@@ -231,9 +254,13 @@ Persistent runtime information belongs exclusively to the Thermostat Runtime Sta
 
 Transient runtime information belongs exclusively to the Runtime Context.
 
+Evaluation outputs belong exclusively to the Thermostat Controller Result.
+
 The Runtime Context Factory is responsible only for assembling runtime information.
 
 The Thermostat Controller is the only component allowed to modify the Thermostat Runtime State.
+
+The Climate Entity never derives thermostat behaviour.
 
 No component shall duplicate another component's responsibility.
 

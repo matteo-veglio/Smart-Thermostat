@@ -2,7 +2,7 @@
 
 ## Functional Specification
 
-Version: 1.0
+Version: 2.1
 
 Status: Frozen
 
@@ -10,293 +10,269 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines the functional behaviour of the Smart Thermostat.
+The Smart Thermostat controls the indoor climate of a building.
 
-It specifies how the thermostat shall behave from the user's perspective.
+Its objective is to maintain the requested comfort temperature while optimizing energy usage.
 
-Implementation details are intentionally excluded from this document.
+The thermostat may operate using:
 
----
+- Boiler
+- Air Conditioner
 
-# 2. Functional Overview
-
-The Smart Thermostat is a virtual thermostat implemented as a standard Home Assistant Climate Entity.
-
-The thermostat continuously evaluates the indoor temperature and automatically decides whether heating, cooling or no action is required.
-
-When heating is required, the thermostat automatically selects the most appropriate heating source according to the configured energy strategy.
-
-When cooling is required, the thermostat controls the configured cooling device.
-
-The user interacts only with the Climate Entity.
-
-The user never directly controls the internal decision process.
+The preferred heating source is selected automatically according to the available photovoltaic surplus.
 
 ---
 
-# 3. Climate Entity
+# 2. Operating Modes
 
-The integration shall expose exactly one Climate Entity.
+The thermostat supports the following HVAC modes:
 
-The entity shall behave as a native Home Assistant thermostat.
+- OFF
+- HEAT
+- COOL
+- AUTO
 
-No custom frontend components shall be required.
-
----
-
-# 4. HVAC Modes
-
-The thermostat shall support only the following HVAC modes:
-
-- Off
-- Heat/Cool
-
-No additional HVAC modes shall be implemented.
+The thermostat shall always operate in exactly one HVAC mode.
 
 ---
 
-## Off
+# 3. Heating
 
-When the HVAC mode is Off:
+When HVAC mode is HEAT or AUTO, the thermostat may request heating.
 
-- all controlled devices shall be turned off;
-- no heating request shall be generated;
-- no cooling request shall be generated.
+Heating demand is determined exclusively by the Demand Engine.
 
----
-
-## Heat/Cool
-
-When the HVAC mode is Heat/Cool:
-
-- the thermostat shall continuously evaluate the indoor temperature;
-- the thermostat shall determine whether heating is required;
-- the thermostat shall determine whether cooling is required;
-- the thermostat shall remain idle when no action is required.
-
-The thermostat shall automatically select the appropriate operating mode.
-
-The user shall never manually choose between heating and cooling.
+The heating source is selected by the Source Engine.
 
 ---
 
-# 5. Target Temperatures
+# 4. Cooling
 
-The thermostat shall expose two independent target temperatures.
+When HVAC mode is COOL or AUTO, the thermostat may request cooling.
 
-Heating Target
+Cooling demand is determined exclusively by the Demand Engine.
 
-Cooling Target
+Cooling always uses the configured cooling device.
 
-Both values shall be configurable through the standard Home Assistant Climate interface.
-
-The thermostat shall internally use the appropriate target according to the current thermal demand.
+No cooling source selection is performed.
 
 ---
 
-# 6. Presets
+# 5. Temperature Control
 
-The thermostat shall support the following presets:
+The thermostat shall regulate room temperature using:
 
-- Away
-- Home
-- Night
+- Heating Target Temperature
+- Cooling Target Temperature
+- Thermostat Hysteresis
 
-The preset shall only represent the current operating context.
+The hysteresis algorithm is defined exclusively in:
 
-The integration shall never automatically change the preset.
-
-Preset changes are managed externally by Home Assistant.
+- specs/05_control_algorithm.md
 
 ---
 
-# 7. Input Entities
+# 6. Heating Source Selection
 
-The thermostat shall receive the following entities as configuration parameters.
+Whenever heating demand exists, the thermostat selects one heating source.
 
-Heating Source 1
+Possible heating sources:
 
-Primary heating device.
+- Boiler
+- Air Conditioner
 
-Typically a boiler.
+The selection algorithm is defined exclusively in:
 
-Heating Source 2
-
-Secondary heating device.
-
-Typically an air conditioner operating in heating mode.
-
-Cooling Source
-
-Air conditioner operating in cooling mode.
-
-Indoor Temperature Sensor
-
-Temperature used by the thermostat.
-
-Humidity Sensor
-
-Humidity displayed by the Climate Entity.
-
-Instantaneous Energy Surplus
-
-Current photovoltaic surplus available.
-
-Minimum Energy Surplus
-
-Minimum surplus required to prefer the air conditioner over the boiler.
-
-The integration assumes that every configured entity already provides the correct value.
-
-The integration shall never perform calculations such as averages, filtering or sensor selection.
+- specs/06_decision_rules.md
 
 ---
 
-# 8. Thermal Demand
+# 7. Protection
 
-The thermostat shall continuously evaluate the indoor temperature.
+The thermostat protects connected devices by enforcing:
 
-The thermostat shall determine one of the following operating conditions:
+- Minimum Device Runtime
+- Shutdown Delay
+- Minimum Source Runtime
+- Source Change Delay
 
-- Heating Required
-- Cooling Required
-- No Thermal Demand
+Protection rules are defined exclusively in:
 
-Only one thermal demand may exist at any given time.
-
-Heating and cooling requests shall never coexist.
-
----
-
-# 9. Heating Behaviour
-
-When heating is required, the thermostat shall automatically select one heating source.
-
-The selection shall be completely automatic.
-
-The user shall not manually select the heating source.
-
-Only one heating source may operate at any given time.
+- specs/12_controller_protection_workflow.md
 
 ---
 
-# 10. Cooling Behaviour
+# 8. Logical Thermostat State
 
-When cooling is required, the thermostat shall control the configured cooling device.
+The thermostat maintains exactly one logical state.
 
-Only one cooling device may operate at any given time.
+Possible states:
 
----
+- OFF
+- IDLE
+- STARTING
+- HEATING
+- COOLING
+- STOPPING
 
-# 11. Heating Source Selection
-
-The thermostat shall evaluate the available photovoltaic surplus.
-
-If the available surplus satisfies the configured energy policy, the thermostat shall use the air conditioner for heating.
-
-Otherwise, the thermostat shall use the boiler.
-
-The selection process shall be completely automatic.
-
-The thermostat shall protect physical devices from unnecessary source changes.
+The logical state is managed exclusively by the State Machine.
 
 ---
 
-# 12. Device Protection
+# 9. Runtime Evaluation
 
-The thermostat shall minimize unnecessary switching of physical devices.
+For every evaluation cycle:
 
-The thermostat shall include protection mechanisms for:
-
-- compressors;
-- boilers;
-- source switching.
-
-Protection mechanisms shall always have priority over fast reactions to temporary operating conditions.
+1. A Runtime Context is created.
+2. The Thermostat Controller evaluates the Runtime Context.
+3. The Thermostat Controller updates the State Machine if required.
+4. The Thermostat Controller updates the Thermostat Runtime State if required.
+5. The Thermostat Controller returns the evaluation result.
 
 ---
 
-# 13. Temperature Regulation
+# 10. Heating Source
 
-The thermostat shall regulate room temperature using the configured indoor temperature sensor.
+The thermostat always exposes the currently active heating source.
 
-The thermostat shall never rely on the internal temperature sensors of the air conditioner for thermal regulation.
+Possible values:
 
-The thermostat shall compensate for inaccuracies of the HVAC internal sensors.
+- Boiler
+- Air Conditioner
+
+The current heating source is stored inside the Thermostat Runtime State.
 
 ---
 
-# 14. Humidity
+# 11. Current Operation
 
-The humidity sensor is provided for information only.
+The thermostat always exposes the physical operation currently being performed.
 
-Humidity shall be displayed by the Climate Entity.
+Current Operation is independent from the logical Thermostat State.
 
-Humidity shall not influence heating or cooling decisions.
+Possible values are:
+
+- NONE
+- HEATING
+- COOLING
+
+Current Operation is produced exclusively by the Thermostat Controller.
+
+The Climate Entity shall never derive the Current Operation.
+
+---
+
+# 12. Availability
+
+The thermostat is available only when every mandatory runtime dependency required for evaluation is available.
+
+Optional runtime values shall never make the thermostat unavailable.
+
+---
+
+# 13. Runtime Context
+
+The Runtime Context is an immutable snapshot created for every evaluation cycle.
+
+It contains:
+
+- Home Assistant runtime information
+- Config Entry configuration
+- Thermostat Runtime State snapshot
+
+The Runtime Context is discarded after the evaluation completes.
+
+---
+
+# 14. Thermostat Runtime State
+
+The Thermostat Runtime State stores persistent runtime information shared across evaluation cycles.
+
+It survives between evaluations.
+
+It is updated exclusively by the Thermostat Controller.
+
+Its lifecycle is defined in:
+
+- specs/16_runtime_state_management.md
 
 ---
 
 # 15. HVAC Action
 
-The thermostat shall expose the standard Home Assistant HVAC Action.
+The Home Assistant HVAC Action represents the physical operation currently being performed by the thermostat.
 
-Possible values include:
+HVAC Action is exposed exclusively by the Climate Entity.
 
-- Off
-- Idle
-- Heating
-- Cooling
+The Climate Entity SHALL determine the HVAC Action exclusively from the Thermostat Controller Result.
 
-The HVAC Action shall always represent the current operating state of the thermostat.
+The Climate Entity SHALL NOT derive HVAC Action directly from the Thermostat State.
 
----
+Possible HVAC Action values are:
 
-# 16. User Experience
+- OFF
+- IDLE
+- HEATING
+- COOLING
 
-From the user's perspective, the thermostat behaves as a standard Home Assistant thermostat.
+The Thermostat Controller Result SHALL expose the Current Operation.
 
-The user shall only interact with:
+Possible Current Operation values are:
 
-- HVAC mode
-- Heating target
-- Cooling target
-- Preset
+- NONE
+- HEATING
+- COOLING
 
-All remaining decisions shall be performed automatically by the integration.
+The Climate Entity SHALL determine the HVAC Action according to the following mapping.
 
----
+| Thermostat State | Current Operation | HVAC Action |
+|------------------|-------------------|-------------|
+| OFF | NONE | OFF |
+| IDLE | NONE | IDLE |
+| STARTING | HEATING | HEATING |
+| STARTING | COOLING | COOLING |
+| HEATING | HEATING | HEATING |
+| COOLING | COOLING | COOLING |
+| STOPPING | HEATING | HEATING |
+| STOPPING | COOLING | COOLING |
 
-# 17. Functional Boundaries
+Current Operation represents the physical operation currently being performed.
 
-The thermostat is responsible for:
+It is independent from the logical Thermostat State.
 
-- determining thermal demand;
-- selecting the heating source;
-- controlling the selected device;
-- exposing a Climate Entity.
+The Thermostat Controller is responsible for exposing the Current Operation.
 
-The thermostat is not responsible for:
+The Climate Entity is responsible only for applying the mapping defined above.
 
-- photovoltaic calculations;
-- temperature averaging;
-- sensor selection;
-- presence detection;
-- scheduling;
-- automatic preset selection;
-- home energy management.
-
-These responsibilities remain external to the integration.
+No other HVAC Action mapping shall be implemented.
 
 ---
 
-# 18. References
+# 16. Responsibilities
 
-The implementation details described by this specification are defined in the following documents:
+The Smart Thermostat domain is divided into specialized components.
 
-- 03_architecture.md
-- 04_state_machine.md
-- 05_control_algorithm.md
-- 06_configuration.md
-- 07_entities.md
+| Component | Responsibility |
+|-----------|----------------|
+| Runtime Context Factory | Build Runtime Context |
+| Thermostat Controller | Orchestrate the evaluation |
+| State Machine | Maintain logical state |
+| Demand Engine | Evaluate thermal demand |
+| Source Engine | Select heating source |
+| Protection Engine | Evaluate timing constraints |
+| Transition Table | Determine requested logical state |
+| Device Controllers | Execute physical device commands |
 
-This document defines only the functional behaviour of the thermostat.
+Every component has exactly one responsibility.
+
+No component shall duplicate another component's behaviour.
+
+---
+
+# 17. Source of Truth
+
+This document defines the functional behaviour of the Smart Thermostat.
+
+The detailed implementation rules are defined by the dedicated specification documents.
+
+Every implementation shall strictly follow this specification.

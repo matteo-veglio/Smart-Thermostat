@@ -2,7 +2,7 @@
 
 ## Runtime Context
 
-Version: 2.0
+Version: 2.1
 
 Status: Frozen
 
@@ -30,6 +30,12 @@ The Runtime Context SHALL:
 - be immutable during a single evaluation cycle;
 - contain no methods implementing business logic;
 - be independent from Home Assistant.
+
+The Runtime Context contains evaluation inputs only.
+
+It never contains evaluation outputs.
+
+Evaluation outputs are produced exclusively by the Thermostat Controller Result.
 
 The Runtime Context SHALL NOT:
 
@@ -71,7 +77,7 @@ The Runtime Context SHALL contain the following information.
 ## Environment
 
 - Current Room Temperature
-- Current Humidity
+- Current Humidity (optional)
 
 ---
 
@@ -113,6 +119,36 @@ The Runtime Context shall never modify these values.
 - Minimum Source Runtime
 - Shutdown Delay
 - Source Change Delay
+
+---
+
+## Optional Runtime Values
+
+Some runtime values are optional.
+
+If a runtime value is optional:
+
+- it may be absent from the Runtime Context;
+- domain components that do not require it shall ignore it.
+
+Currently the following field is optional:
+
+- Current Humidity
+
+The absence of an optional runtime value shall never prevent a thermostat evaluation unless explicitly required by another specification.
+
+---
+
+## Values Never Contained in the Runtime Context
+
+The Runtime Context never contains:
+
+- Current Operation;
+- HVAC Action;
+- Device commands;
+- Thermostat Controller Result values.
+
+These values are produced only after the evaluation has completed.
 
 ---
 
@@ -174,6 +210,12 @@ The Runtime Context intentionally contains:
 - no calculations;
 - no decision logic;
 - no mutable runtime state.
+
+The Runtime Context may contain optional runtime values.
+
+Domain components shall read only the fields required for their own evaluation.
+
+Components shall not require optional fields unless explicitly documented.
 
 Persistent runtime information is managed separately by the Thermostat Runtime State.
 
