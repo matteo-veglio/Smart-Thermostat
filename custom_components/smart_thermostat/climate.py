@@ -14,6 +14,7 @@ from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, Un
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .runtime_context_factory import RuntimeContextFactory
 from .runtime_data import SmartThermostatConfigEntry
 from .thermostat_controller import ThermostatController
 
@@ -29,6 +30,7 @@ async def async_setup_entry(
         [
             SmartThermostatClimateEntity(
                 thermostat_controller=entry.runtime_data.thermostat_controller,
+                runtime_context_factory=entry.runtime_data.runtime_context_factory,
                 unique_id=entry.entry_id,
                 name=entry.data[CONF_NAME],
             )
@@ -54,10 +56,12 @@ class SmartThermostatClimateEntity(ClimateEntity):
     def __init__(
         self,
         thermostat_controller: ThermostatController,
+        runtime_context_factory: RuntimeContextFactory,
         unique_id: str,
         name: str,
     ) -> None:
         self._thermostat_controller = thermostat_controller
+        self._runtime_context_factory = runtime_context_factory
 
         # General
         self._attr_name: str | None = name
