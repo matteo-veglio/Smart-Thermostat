@@ -2,7 +2,7 @@
 
 ## Decision Rules
 
-Version: 1.0
+Version: 2.0
 
 Status: Frozen
 
@@ -10,214 +10,143 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines every decision rule used by the Smart Thermostat.
+This document defines the decision rules used by the Smart Thermostat.
 
-Decision rules determine **when** an action is allowed.
+Every decision is delegated to a specialized engine.
 
-The control algorithm defines **how** the thermostat operates.
-
-The decision rules define **whether** an operation may be executed.
+No component shall make decisions outside its responsibility.
 
 ---
 
-# 2. General Principles
+# 2. Demand Evaluation
 
-Every decision made by the thermostat shall follow documented rules.
+The Demand Engine evaluates the thermal demand.
 
-Decision rules shall always produce deterministic results.
+Possible outputs are:
 
-The same inputs and the same internal state shall always produce the same decision.
+- NO_DEMAND
+- HEATING
+- COOLING
 
-Decision rules shall never directly control physical devices.
+The Demand Engine evaluates only:
 
-Their only purpose is to authorize or deny operations.
+- current room temperature;
+- heating target temperature;
+- cooling target temperature;
+- thermostat hysteresis.
 
----
+The Demand Engine never evaluates:
 
-# 3. Thermal Demand Decision
-
-The thermostat shall evaluate the indoor temperature using the configured target temperatures and thermostat tolerance.
-
-The possible outcomes are:
-
-- Heating Required
-- Cooling Required
-- No Thermal Demand
-
-Only one outcome may exist during a control cycle.
-
-Heating and cooling shall never be requested simultaneously.
-
-The detailed thermal demand calculation is defined by the thermostat tolerance configuration.
+- photovoltaic surplus;
+- heating source;
+- protection timers.
 
 ---
 
-# 4. Heating Source Decision
+# 3. Heating Source Selection
 
-When heating is required, the thermostat shall determine which heating source should be used.
+If the Demand Engine requests HEATING, the Thermostat Controller requests the heating source from the Source Engine.
 
-Possible heating sources are:
-
-- Boiler
-- Air Conditioner
-
-The decision shall consider:
+The Source Engine compares:
 
 - instantaneous energy surplus;
-- minimum energy surplus;
-- current operating state;
-- protection rules.
+- minimum energy surplus.
 
-Only one heating source may be active.
+Decision:
 
----
+If:
 
-# 5. Heating Source Change Decision
+```
+Instantaneous Surplus ≥ Minimum Surplus
+```
 
-A heating source change shall only be allowed when all required conditions are satisfied.
+Heating Source:
 
-The thermostat shall never continuously alternate between heating sources due to temporary operating conditions.
+```
+AIR_CONDITIONER
+```
 
-Source switching shall be protected by dedicated protection rules.
+Otherwise:
 
-The detailed protection parameters are defined in the configuration document.
-
----
-
-# 6. Cooling Decision
-
-Cooling shall always use the configured air conditioner.
-
-No alternative cooling sources are supported.
+```
+BOILER
+```
 
 ---
 
-# 7. Control Curve Decision
+# 4. Cooling Source
 
-The Climate Controller shall determine the HVAC target temperature using a Control Curve.
+Cooling always uses the configured air conditioner.
 
-The Control Curve shall consist of ordered intervals.
-
-Each interval shall contain:
-
-- Minimum Temperature Error
-- HVAC Target Temperature
-
-The algorithm shall evaluate the intervals from top to bottom.
-
-The first matching interval shall always be selected.
-
-The resulting HVAC target temperature shall be used for the current control cycle.
+No source selection is required.
 
 ---
 
-# 8. Heating Control Curve
+# 5. Protection Validation
 
-Heating regulation shall use a dedicated Heating Control Curve.
+Before applying any state or source change, the Thermostat Controller asks the Protection Engine whether the transition is allowed.
 
-The Heating Control Curve shall satisfy the following rules.
+The Protection Engine evaluates:
 
-- The intervals shall be ordered by decreasing temperature error.
-- Each interval shall be evaluated independently.
-- Only one interval may be selected.
-- HVAC target temperatures shall increase monotonically as the temperature error increases.
+- shutdown delay;
+- source change delay;
+- minimum device runtime;
+- minimum source runtime.
 
-The numerical values of the curve are calibration parameters.
+The Protection Engine returns either:
 
-The evaluation method is part of the algorithm and shall never change.
+- ALLOWED
+- DENIED
 
----
-
-# 9. Cooling Control Curve
-
-Cooling regulation shall use a dedicated Cooling Control Curve.
-
-The Cooling Control Curve shall satisfy the following rules.
-
-- The intervals shall be ordered by decreasing temperature error.
-- Each interval shall be evaluated independently.
-- Only one interval may be selected.
-- HVAC target temperatures shall decrease monotonically as the temperature error increases.
-
-The numerical values of the curve are calibration parameters.
-
-The evaluation method is part of the algorithm and shall never change.
+It never changes the decision itself.
 
 ---
 
-# 10. Command Update Decision
+# 6. State Machine
 
-The thermostat shall compare the requested operating values with the current device state.
+The Thermostat Controller updates the State Machine only after the Protection Engine has approved the transition.
 
-Commands shall only be generated when an operating value changes.
+The State Machine stores only the logical operating state.
 
-Repeated identical commands are forbidden.
+It never stores:
 
----
-
-# 11. Shutdown Decision
-
-The thermostat shall never immediately stop an operating device when thermal demand ends.
-
-The shutdown decision shall always be delayed.
-
-During the delay period:
-
-- thermal demand shall continue to be evaluated;
-- the shutdown may be cancelled if thermal demand returns.
-
-Only after the complete delay expires may the operating device be turned off.
+- heating source;
+- cooling source;
+- photovoltaic surplus;
+- timers.
 
 ---
 
-# 12. Minimum Runtime Decision
+# 7. Device Commands
 
-Every controlled device shall remain active for a configurable minimum runtime.
+After all decisions have been completed:
 
-The thermostat shall never stop a device before the minimum runtime expires.
-
-Emergency shutdown conditions are outside the scope of this document.
-
----
-
-# 13. Minimum Source Runtime Decision
-
-After selecting a heating source, the thermostat shall maintain the selected source for a configurable minimum duration.
-
-Temporary fluctuations of photovoltaic surplus shall not immediately trigger a source change.
-
-The objective is to minimize unnecessary boiler and compressor cycling.
+1. Demand Engine determines the thermal demand.
+2. Source Engine selects the heating source (heating only).
+3. Protection Engine validates the transition.
+4. State Machine updates the logical operating state.
+5. Thermostat Controller dispatches commands to the appropriate Device Controller.
 
 ---
 
-# 14. Protection Priority
+# 8. Design Principles
 
-Protection rules always have higher priority than operating requests.
+Every engine answers exactly one question.
 
-Whenever a protection rule conflicts with a normal operating request, the protection rule shall prevail.
+| Engine | Question |
+|--------|----------|
+| Demand Engine | Is heating or cooling required? |
+| Source Engine | Which heating source shall be used? |
+| Protection Engine | Is the requested transition currently allowed? |
+| State Machine | What is the current logical operating state? |
+| Thermostat Controller | How are all engines orchestrated? |
 
----
-
-# 15. Calibration Principles
-
-The following elements are considered calibration parameters:
-
-- Heating Control Curve values;
-- Cooling Control Curve values;
-- Thermostat tolerance;
-- Shutdown delay;
-- Minimum runtime;
-- Minimum source runtime;
-- Minimum energy surplus.
-
-Calibration parameters may change without modifying the decision rules.
+No engine shall duplicate another engine's responsibility.
 
 ---
 
-# 16. Source of Truth
+# 9. Source of Truth
 
-This document defines every decision rule used by the Smart Thermostat.
+This document defines the official decision model of the Smart Thermostat.
 
-The implementation shall never introduce undocumented decision logic.
-
-Any modification of the decision process requires an explicit update of this document.
+Every implementation shall strictly follow these rules.
