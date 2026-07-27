@@ -7,6 +7,9 @@ from .const import DOMAIN
 
 CONF_INDOOR_TEMPERATURE_SENSOR = "indoor_temperature_sensor"
 CONF_INDOOR_HUMIDITY_SENSOR = "indoor_humidity_sensor"
+CONF_HEATING_SOURCE_1 = "heating_source_1"
+CONF_HEATING_SOURCE_2 = "heating_source_2"
+CONF_COOLING_SOURCE = "cooling_source"
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -16,6 +19,15 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_INDOOR_HUMIDITY_SENSOR): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor")
+        ),
+        vol.Required(CONF_HEATING_SOURCE_1): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="switch")
+        ),
+        vol.Required(CONF_HEATING_SOURCE_2): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="climate")
+        ),
+        vol.Required(CONF_COOLING_SOURCE): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="climate")
         ),
     }
 )
