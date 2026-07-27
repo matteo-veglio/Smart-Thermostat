@@ -2,7 +2,7 @@
 
 ## Decision Rules
 
-Version: 2.1
+Version: 2.2
 
 Status: Frozen
 
@@ -12,25 +12,41 @@ Status: Frozen
 
 This document defines the decision rules used by the Smart Thermostat.
 
-Every decision is delegated to a specialized engine.
+Every decision is delegated to a specialized component.
 
 No component shall make decisions outside its responsibility.
 
 ---
 
-# 2. Demand Evaluation
+# 2. Runtime Context
+
+Every thermostat evaluation starts with a Runtime Context.
+
+The Runtime Context contains every runtime value required by the domain layer.
+
+The Runtime Context is created by the Runtime Context Factory.
+
+The Runtime Context is immutable.
+
+Every domain component reads only the information required for its own evaluation.
+
+No domain component shall retrieve information directly from Home Assistant.
+
+---
+
+# 3. Demand Evaluation
 
 The Thermostat Controller requests the current thermal demand from the Demand Engine.
 
-The Demand Engine receives the following inputs:
+The Demand Engine receives the Runtime Context.
+
+It reads only:
 
 - current room temperature;
 - heating target temperature;
 - cooling target temperature;
 - thermostat hysteresis;
 - current thermostat state.
-
-The current thermostat state is provided by the State Machine and is used exclusively to determine whether the thermostat is already heating or cooling, allowing the Demand Engine to correctly apply directional hysteresis.
 
 The Demand Engine returns exactly one value:
 
@@ -47,11 +63,13 @@ The Demand Engine never:
 
 ---
 
-# 3. Heating Source Selection
+# 4. Heating Source Selection
 
-If the Demand Engine returns **HEATING**, the Thermostat Controller requests the heating source from the Source Engine.
+If the Demand Engine returns **HEATING**, the Thermostat Controller requests the preferred heating source from the Source Engine.
 
-The Source Engine compares:
+The Source Engine receives the Runtime Context.
+
+It reads only:
 
 - instantaneous energy surplus;
 - minimum energy surplus.
@@ -80,45 +98,64 @@ The Source Engine performs no other evaluations.
 
 ---
 
-# 4. Cooling Source
+# 5. Cooling Source
 
-If the Demand Engine returns **COOLING**, the cooling source is always the configured air conditioner.
+If the Demand Engine returns **COOLING**, the cooling source is always the configured Cooling Source.
 
 No source selection is required.
 
 ---
 
-# 5. Protection Validation
+# 6. Requested State Selection
 
-Before applying any state transition or source change, the Thermostat Controller requests authorization from the Protection Engine.
+The Thermostat Controller requests the next logical thermostat state from the Transition Table.
 
-The Protection Engine evaluates:
+The Transition Table receives:
 
-- shutdown delay;
-- source change delay;
-- minimum device runtime;
-- minimum source runtime.
+- current thermostat state;
+- current demand.
 
-The Protection Engine returns exactly one result:
+It returns:
+
+- requested thermostat state.
+
+The Thermostat Controller never derives transition rules.
+
+---
+
+# 7. Protection Validation
+
+Whenever a state transition or heating source change is requested, the Thermostat Controller invokes the Protection Engine according to:
+
+- specs/12_controller_protection_workflow.md
+
+The Protection Engine receives the Runtime Context.
+
+It reads only the timing values required for the requested protection check.
+
+The Protection Engine returns exactly one value:
 
 - ALLOWED
 - DENIED
 
 The Protection Engine never changes the requested action.
 
-It only authorizes or rejects it.
-
 ---
 
-# 6. State Machine
+# 8. State Machine
 
-The State Machine stores only the logical operating state of the thermostat.
+If the Protection Engine authorizes the requested transition:
 
-The Thermostat Controller is responsible for requesting state transitions.
+The Thermostat Controller requests the State Machine to update the logical thermostat state.
 
-The Demand Engine may read the current state in order to correctly apply thermostat hysteresis.
+The State Machine stores only:
 
-The Demand Engine shall never modify the State Machine.
+- OFF
+- IDLE
+- STARTING
+- HEATING
+- COOLING
+- STOPPING
 
 The State Machine never stores:
 
@@ -130,39 +167,39 @@ The State Machine never stores:
 
 ---
 
-# 7. Device Commands
+# 9. Device Commands
 
-Once all decisions have been completed:
+After all domain decisions have been completed:
 
-1. The Demand Engine evaluates the thermal demand.
-2. If heating is required, the Source Engine selects the heating source.
-3. The Protection Engine validates the requested transition.
-4. The State Machine updates the logical operating state.
-5. The Thermostat Controller dispatches commands to the appropriate Device Controller.
+The Thermostat Controller requests the appropriate Device Controller to execute the required action.
+
+Device Controllers never make decisions.
+
+They execute commands only.
 
 ---
 
-# 8. Design Principles
+# 10. Design Principles
 
-Every engine answers exactly one question.
+Every component answers exactly one question.
 
-| Engine | Responsibility |
-|--------|----------------|
-| Demand Engine | Is there a thermal demand? |
+| Component | Responsibility |
+|----------|----------------|
+| Runtime Context Factory | Collect runtime information |
+| Runtime Context | Transport runtime information |
+| Demand Engine | Is there thermal demand? |
+| Transition Table | Which logical state is requested? |
 | Source Engine | Which heating source should be used? |
-| Protection Engine | Is the requested transition allowed? |
-| State Machine | What is the current logical operating state? |
-| Thermostat Controller | Orchestrate all components. |
-
-The Demand Engine is the only component responsible for evaluating thermostat hysteresis.
-
-The State Machine is the only component responsible for storing the logical operating state.
+| Protection Engine | Is the requested operation allowed? |
+| State Machine | What is the current logical thermostat state? |
+| Thermostat Controller | Orchestrate the domain components |
+| Device Controllers | Execute device commands |
 
 No component shall duplicate another component's responsibility.
 
 ---
 
-# 9. Source of Truth
+# 11. Source of Truth
 
 This document defines the official decision model of the Smart Thermostat.
 

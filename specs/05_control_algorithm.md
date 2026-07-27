@@ -2,7 +2,7 @@
 
 ## Control Algorithm
 
-Version: 2.0
+Version: 2.1
 
 Status: Frozen
 
@@ -22,25 +22,37 @@ It never evaluates protection logic.
 
 ---
 
-# 2. Inputs
+# 2. Runtime Context
 
-The Demand Engine receives the following inputs:
+The Demand Engine receives a Runtime Context.
 
-| Input | Description |
-|--------|-------------|
+The Runtime Context contains every runtime value required by the domain layer.
+
+The Demand Engine reads only the information required for thermal demand evaluation.
+
+The Runtime Context is immutable.
+
+The Demand Engine never modifies it.
+
+---
+
+# 3. Inputs Used by the Demand Engine
+
+From the Runtime Context, the Demand Engine reads:
+
+| Runtime Context Field | Description |
+|-----------------------|-------------|
 | Current Room Temperature | Current measured room temperature. |
 | Heating Target Temperature | User heating setpoint. |
 | Cooling Target Temperature | User cooling setpoint. |
 | Thermostat Hysteresis | Configured thermostat hysteresis. |
-| Current Thermostat State | Current logical state provided by the State Machine. |
+| Current Thermostat State | Current logical thermostat state. |
 
-The Current Thermostat State is read-only.
-
-The Demand Engine shall never modify the State Machine.
+No other Runtime Context fields participate in the thermal demand calculation.
 
 ---
 
-# 3. Outputs
+# 4. Outputs
 
 The Demand Engine returns exactly one value:
 
@@ -52,7 +64,7 @@ No other outputs are allowed.
 
 ---
 
-# 4. Heating Algorithm
+# 5. Heating Algorithm
 
 The algorithm behaves differently depending on the current thermostat state.
 
@@ -66,21 +78,25 @@ Heating demand begins when:
 Current Temperature ≤ Heating Target − Hysteresis
 ```
 
-## Heating Stop
+## Heating Continue
 
 If the current thermostat state is `HEATING`:
 
-Heating demand ends when:
+Heating demand continues while:
 
 ```
-Current Temperature ≥ Heating Target
+Current Temperature < Heating Target
 ```
 
-Otherwise, the engine continues requesting HEATING.
+Otherwise the Demand Engine returns:
+
+```
+NO_DEMAND
+```
 
 ---
 
-# 5. Cooling Algorithm
+# 6. Cooling Algorithm
 
 The algorithm behaves differently depending on the current thermostat state.
 
@@ -94,23 +110,17 @@ Cooling demand begins when:
 Current Temperature ≥ Cooling Target + Hysteresis
 ```
 
-## Cooling Stop
+## Cooling Continue
 
 If the current thermostat state is `COOLING`:
 
-Cooling demand ends when:
+Cooling demand continues while:
 
 ```
-Current Temperature ≤ Cooling Target
+Current Temperature > Cooling Target
 ```
 
-Otherwise, the engine continues requesting COOLING.
-
----
-
-# 6. Idle Condition
-
-If neither the heating nor cooling conditions are satisfied, the engine returns:
+Otherwise the Demand Engine returns:
 
 ```
 NO_DEMAND
@@ -118,28 +128,40 @@ NO_DEMAND
 
 ---
 
-# 7. Responsibilities
+# 7. Idle Condition
+
+If neither heating nor cooling conditions are satisfied:
+
+```
+NO_DEMAND
+```
+
+is returned.
+
+---
+
+# 8. Responsibilities
 
 The Demand Engine SHALL:
 
 - evaluate thermal demand;
 - apply thermostat hysteresis;
-- use the current thermostat state only to determine the correct hysteresis threshold;
+- read only the Runtime Context fields required for demand evaluation;
 - return exactly one demand.
 
 The Demand Engine SHALL NOT:
 
+- modify the Runtime Context;
 - modify the State Machine;
 - select heating sources;
 - evaluate photovoltaic surplus;
 - execute timers;
-- execute protection logic;
-- communicate with Home Assistant.
+- execute protection logic.
 
 ---
 
-# 8. Source of Truth
+# 9. Source of Truth
 
-This document is the only definition of the Smart Thermostat demand evaluation algorithm.
+This document defines the official demand evaluation algorithm of the Smart Thermostat.
 
 Every implementation shall strictly follow this specification.

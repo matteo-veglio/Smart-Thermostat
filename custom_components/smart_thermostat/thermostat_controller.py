@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .demand_engine import Demand, DemandEngine
 from .protection_engine import Permission, ProtectionEngine
+from .runtime_context import RuntimeContext
 from .source_engine import HeatingSource, SourceEngine
 from .state_machine import StateMachine, ThermostatState
 from .transition_table import TransitionTable
@@ -32,33 +33,14 @@ class ThermostatController:
         self._protection_engine = protection_engine
         self._transition_table = transition_table
 
-    def evaluate(
-        self,
-        *,
-        current_temperature: float,
-        heating_target_temperature: float,
-        cooling_target_temperature: float,
-        hysteresis: float,
-        instantaneous_energy_surplus: float,
-        minimum_energy_surplus: float,
-        current_heating_source: HeatingSource,
-        now: float,
-        device_started_at: float,
-        minimum_device_runtime: float,
-        demand_ended_at: float,
-        shutdown_delay: float,
-        source_selected_at: float,
-        minimum_source_runtime: float,
-        desired_source_differs_since: float,
-        source_change_delay: float,
-    ) -> ThermostatControllerResult:
-        current_state = self._state_machine.current_state
+    def evaluate(self, context: RuntimeContext) -> ThermostatControllerResult:
+        current_state = context.current_state
 
         demand = self._demand_engine.evaluate_demand(
-            current_temperature=current_temperature,
-            heating_target_temperature=heating_target_temperature,
-            cooling_target_temperature=cooling_target_temperature,
-            hysteresis=hysteresis,
+            current_temperature=context.current_temperature,
+            heating_target_temperature=context.heating_target_temperature,
+            cooling_target_temperature=context.cooling_target_temperature,
+            hysteresis=context.hysteresis,
             current_state=current_state,
         )
 
@@ -67,22 +49,22 @@ class ThermostatController:
 
         if demand == Demand.HEATING:
             requested_heating_source = self._source_engine.evaluate_source(
-                instantaneous_energy_surplus=instantaneous_energy_surplus,
-                minimum_energy_surplus=minimum_energy_surplus,
+                instantaneous_energy_surplus=context.instantaneous_energy_surplus,
+                minimum_energy_surplus=context.minimum_energy_surplus,
             )
 
-            if requested_heating_source != current_heating_source:
+            if requested_heating_source != context.current_heating_source:
                 source_runtime_permission = self._protection_engine.evaluate_minimum_source_runtime(
-                    now=now,
-                    source_selected_at=source_selected_at,
-                    minimum_source_runtime=minimum_source_runtime,
+                    now=context.now,
+                    source_selected_at=context.source_selected_at,
+                    minimum_source_runtime=context.minimum_source_runtime,
                 )
 
                 if source_runtime_permission == Permission.ALLOWED:
                     protection_result = self._protection_engine.evaluate_source_change_delay(
-                        now=now,
-                        desired_source_differs_since=desired_source_differs_since,
-                        source_change_delay=source_change_delay,
+                        now=context.now,
+                        desired_source_differs_since=context.desired_source_differs_since,
+                        source_change_delay=context.source_change_delay,
                     )
                 else:
                     protection_result = source_runtime_permission
@@ -92,16 +74,16 @@ class ThermostatController:
         if requested_state != current_state:
             if current_state == ThermostatState.STOPPING and requested_state == ThermostatState.IDLE:
                 device_runtime_permission = self._protection_engine.evaluate_minimum_device_runtime(
-                    now=now,
-                    device_started_at=device_started_at,
-                    minimum_device_runtime=minimum_device_runtime,
+                    now=context.now,
+                    device_started_at=context.device_started_at,
+                    minimum_device_runtime=context.minimum_device_runtime,
                 )
 
                 if device_runtime_permission == Permission.ALLOWED:
                     protection_result = self._protection_engine.evaluate_shutdown_delay(
-                        now=now,
-                        demand_ended_at=demand_ended_at,
-                        shutdown_delay=shutdown_delay,
+                        now=context.now,
+                        demand_ended_at=context.demand_ended_at,
+                        shutdown_delay=context.shutdown_delay,
                     )
                 else:
                     protection_result = device_runtime_permission
@@ -113,7 +95,7 @@ class ThermostatController:
 
         return ThermostatControllerResult(
             demand=demand,
-            current_heating_source=current_heating_source,
+            current_heating_source=context.current_heating_source,
             requested_heating_source=requested_heating_source,
             current_state=self._state_machine.current_state,
             requested_state=requested_state,
