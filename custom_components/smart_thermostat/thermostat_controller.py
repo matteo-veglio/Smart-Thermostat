@@ -4,27 +4,7 @@ from .demand_engine import Demand, DemandEngine
 from .protection_engine import Permission, ProtectionEngine
 from .source_engine import HeatingSource, SourceEngine
 from .state_machine import StateMachine, ThermostatState
-
-_TRANSITION_TABLE: dict[tuple[ThermostatState, Demand], ThermostatState] = {
-    (ThermostatState.OFF, Demand.NO_DEMAND): ThermostatState.OFF,
-    (ThermostatState.OFF, Demand.HEATING): ThermostatState.OFF,
-    (ThermostatState.OFF, Demand.COOLING): ThermostatState.OFF,
-    (ThermostatState.IDLE, Demand.NO_DEMAND): ThermostatState.IDLE,
-    (ThermostatState.IDLE, Demand.HEATING): ThermostatState.STARTING,
-    (ThermostatState.IDLE, Demand.COOLING): ThermostatState.STARTING,
-    (ThermostatState.STARTING, Demand.NO_DEMAND): ThermostatState.IDLE,
-    (ThermostatState.STARTING, Demand.HEATING): ThermostatState.HEATING,
-    (ThermostatState.STARTING, Demand.COOLING): ThermostatState.COOLING,
-    (ThermostatState.HEATING, Demand.NO_DEMAND): ThermostatState.STOPPING,
-    (ThermostatState.HEATING, Demand.HEATING): ThermostatState.HEATING,
-    (ThermostatState.HEATING, Demand.COOLING): ThermostatState.STOPPING,
-    (ThermostatState.COOLING, Demand.NO_DEMAND): ThermostatState.STOPPING,
-    (ThermostatState.COOLING, Demand.COOLING): ThermostatState.COOLING,
-    (ThermostatState.COOLING, Demand.HEATING): ThermostatState.STOPPING,
-    (ThermostatState.STOPPING, Demand.NO_DEMAND): ThermostatState.IDLE,
-    (ThermostatState.STOPPING, Demand.HEATING): ThermostatState.STARTING,
-    (ThermostatState.STOPPING, Demand.COOLING): ThermostatState.STARTING,
-}
+from .transition_table import TransitionTable
 
 
 @dataclass(frozen=True)
@@ -44,11 +24,13 @@ class ThermostatController:
         demand_engine: DemandEngine,
         source_engine: SourceEngine,
         protection_engine: ProtectionEngine,
+        transition_table: TransitionTable,
     ) -> None:
         self._state_machine = state_machine
         self._demand_engine = demand_engine
         self._source_engine = source_engine
         self._protection_engine = protection_engine
+        self._transition_table = transition_table
 
     def evaluate(
         self,
@@ -105,7 +87,7 @@ class ThermostatController:
                 else:
                     protection_result = source_runtime_permission
 
-        requested_state = _TRANSITION_TABLE[(current_state, demand)]
+        requested_state = self._transition_table.resolve_requested_state(current_state, demand)
 
         if requested_state != current_state:
             if current_state == ThermostatState.STOPPING and requested_state == ThermostatState.IDLE:
