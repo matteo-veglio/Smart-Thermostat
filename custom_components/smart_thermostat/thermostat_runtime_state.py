@@ -1,11 +1,19 @@
 from dataclasses import dataclass
+from enum import Enum
 
 from .source_engine import HeatingSource
+
+
+class CurrentOperation(Enum):
+    NONE = "none"
+    HEATING = "heating"
+    COOLING = "cooling"
 
 
 @dataclass
 class ThermostatRuntimeState:
     current_heating_source: HeatingSource = HeatingSource.BOILER
+    current_operation: CurrentOperation = CurrentOperation.NONE
     device_started_at: float = 0.0
     demand_ended_at: float = 0.0
     source_selected_at: float = 0.0

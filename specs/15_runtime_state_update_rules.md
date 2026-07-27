@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Update Rules
 
-Version: 1.1
+Version: 1.2
 
 Status: Frozen
 
@@ -54,7 +54,44 @@ The Current Heating Source is never reset independently.
 
 ---
 
-# 4. Device Started At
+# 4. Current Operation
+
+This field records the physical operation currently being performed by the thermostat.
+
+Possible values are:
+
+- NONE
+- HEATING
+- COOLING
+
+## Update
+
+Set the Current Operation to:
+
+- HEATING when a heating operation becomes active;
+- COOLING when a cooling operation becomes active.
+
+The value SHALL remain unchanged while the same physical operation continues.
+
+This includes logical states such as:
+
+- STARTING
+- HEATING
+- STOPPING
+
+when they belong to the same physical operation.
+
+## Preserve
+
+Preserve the Current Operation across evaluation cycles while the controlled device continues operating.
+
+## Reset
+
+Set the Current Operation to NONE when no heating or cooling operation remains active.
+
+---
+
+# 5. Device Started At
 
 This timestamp records when the currently controlled heating or cooling device becomes operational.
 
@@ -77,7 +114,7 @@ Reset the timestamp when no heating or cooling device remains active.
 
 ---
 
-# 5. Demand Ended At
+# 6. Demand Ended At
 
 This timestamp records when thermal demand disappears.
 
@@ -97,7 +134,7 @@ Reset the timestamp when a new heating or cooling demand begins.
 
 ---
 
-# 6. Source Selected At
+# 7. Source Selected At
 
 This timestamp records when the currently active heating source became active.
 
@@ -119,7 +156,7 @@ It changes only when another heating source becomes active.
 
 ---
 
-# 7. Desired Source Differs Since
+# 8. Desired Source Differs Since
 
 This timestamp records when the preferred heating source first became different from the currently active heating source.
 
@@ -145,7 +182,7 @@ Reset the timestamp immediately when:
 
 ---
 
-# 8. Atomic Update
+# 9. Atomic Update
 
 All Runtime State updates belonging to a single evaluation cycle SHALL be committed atomically.
 
@@ -155,7 +192,7 @@ If the evaluation fails, the Thermostat Runtime State SHALL remain unchanged.
 
 ---
 
-# 9. Relationship with Protection Engine
+# 10. Relationship with Protection Engine
 
 The Protection Engine never updates the Thermostat Runtime State.
 
@@ -165,7 +202,7 @@ The Thermostat Controller applies Runtime State updates after the evaluation has
 
 ---
 
-# 10. Relationship with Runtime Context
+# 11. Relationship with Runtime Context
 
 The Runtime Context contains a snapshot of the Thermostat Runtime State taken before the evaluation begins.
 
@@ -175,7 +212,7 @@ Updated Runtime State values become visible only during the next evaluation cycl
 
 ---
 
-# 11. Source of Truth
+# 12. Source of Truth
 
 This document defines the official update policy for the Thermostat Runtime State.
 

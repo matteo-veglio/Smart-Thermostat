@@ -5,7 +5,7 @@ from .protection_engine import Permission, ProtectionEngine
 from .runtime_context import RuntimeContext
 from .source_engine import HeatingSource, SourceEngine
 from .state_machine import StateMachine, ThermostatState
-from .thermostat_runtime_state import ThermostatRuntimeState
+from .thermostat_runtime_state import CurrentOperation, ThermostatRuntimeState
 from .transition_table import TransitionTable
 
 
@@ -14,6 +14,7 @@ class ThermostatControllerResult:
     demand: Demand
     current_heating_source: HeatingSource
     requested_heating_source: HeatingSource | None
+    current_operation: CurrentOperation
     current_state: ThermostatState
     requested_state: ThermostatState
     protection_result: Permission | None
@@ -90,8 +91,9 @@ class ThermostatController:
 
         return ThermostatControllerResult(
             demand=demand,
-            current_heating_source=context.current_heating_source,
+            current_heating_source=self._runtime_state.current_heating_source,
             requested_heating_source=requested_heating_source,
+            current_operation=self._runtime_state.current_operation,
             current_state=self._state_machine.current_state,
             requested_state=requested_state,
             protection_result=protection_result,
@@ -142,3 +144,11 @@ class ThermostatController:
             self._runtime_state.device_started_at = context.now
         elif device_stopped:
             self._runtime_state.device_started_at = 0.0
+
+        # specs/15_runtime_state_update_rules.md §4 Current Operation
+        if requested_state == ThermostatState.STARTING and demand == Demand.HEATING:
+            self._runtime_state.current_operation = CurrentOperation.HEATING
+        elif requested_state == ThermostatState.STARTING and demand == Demand.COOLING:
+            self._runtime_state.current_operation = CurrentOperation.COOLING
+        elif device_stopped:
+            self._runtime_state.current_operation = CurrentOperation.NONE

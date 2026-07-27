@@ -2,7 +2,7 @@
 
 ## Runtime Context
 
-Version: 2.1
+Version: 2.3
 
 Status: Frozen
 
@@ -19,6 +19,10 @@ It exists to decouple the domain layer from Home Assistant.
 The Runtime Context contains data only.
 
 It never contains business logic.
+
+The Runtime Context represents only the inputs required for a thermostat evaluation.
+
+The outputs of the evaluation are represented exclusively by the Thermostat Controller Result.
 
 ---
 
@@ -103,6 +107,7 @@ The Runtime Context SHALL include a snapshot of the current Thermostat Runtime S
 This snapshot contains:
 
 - Current Heating Source
+- Current Operation
 - Device Started At
 - Demand Ended At
 - Source Selected At
@@ -143,10 +148,10 @@ The absence of an optional runtime value shall never prevent a thermostat evalua
 
 The Runtime Context never contains:
 
-- Current Operation;
 - HVAC Action;
-- Device commands;
-- Thermostat Controller Result values.
+- Requested Device Actions;
+- Thermostat Controller Result;
+- Device Controller state.
 
 These values are produced only after the evaluation has completed.
 
@@ -162,7 +167,8 @@ For every thermostat evaluation:
 4. The Runtime Context is passed to the Thermostat Controller.
 5. The Thermostat Controller evaluates the Runtime Context.
 6. The Thermostat Controller updates the Thermostat Runtime State if required.
-7. The Runtime Context is discarded.
+7. The Thermostat Controller produces a Thermostat Controller Result.
+8. The Runtime Context is discarded.
 
 A Runtime Context shall never be reused across evaluation cycles.
 
@@ -177,6 +183,8 @@ No component may modify its contents after creation.
 If runtime information changes, a new Runtime Context shall be created.
 
 Persistent runtime information belongs exclusively to the Thermostat Runtime State.
+
+Evaluation outputs belong exclusively to the Thermostat Controller Result.
 
 ---
 
@@ -218,6 +226,8 @@ Domain components shall read only the fields required for their own evaluation.
 Components shall not require optional fields unless explicitly documented.
 
 Persistent runtime information is managed separately by the Thermostat Runtime State.
+
+Evaluation outputs are managed separately by the Thermostat Controller Result.
 
 ---
 

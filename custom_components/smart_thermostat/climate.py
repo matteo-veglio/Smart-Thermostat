@@ -1,3 +1,5 @@
+import time
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -10,15 +12,43 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, UnitOfTemperature
+from homeassistant.const import CONF_NAME, PRECISION_TENTHS, PRECISION_WHOLE, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .config_flow import (
+    CONF_INDOOR_HUMIDITY_SENSOR,
+    CONF_INDOOR_TEMPERATURE_SENSOR,
+    CONF_INSTANTANEOUS_ENERGY_SURPLUS,
+    CONF_MINIMUM_DEVICE_RUNTIME,
+    CONF_MINIMUM_ENERGY_SURPLUS,
+    CONF_MINIMUM_SOURCE_RUNTIME,
+    CONF_SHUTDOWN_DELAY,
+    CONF_SOURCE_CHANGE_DELAY,
+    CONF_THERMOSTAT_TOLERANCE,
+)
 from .runtime_context_factory import RuntimeContextFactory
 from .runtime_data import SmartThermostatConfigEntry
+from .state_machine import StateMachine, ThermostatState
 from .thermostat_controller import ThermostatController
+from .thermostat_runtime_state import CurrentOperation
 
 PRESET_NIGHT = "night"
+
+_HVAC_ACTION_MAP: dict[tuple[ThermostatState, CurrentOperation], HVACAction] = {
+    (ThermostatState.OFF, CurrentOperation.NONE): HVACAction.OFF,
+    (ThermostatState.IDLE, CurrentOperation.NONE): HVACAction.IDLE,
+    (ThermostatState.STARTING, CurrentOperation.HEATING): HVACAction.HEATING,
+    (ThermostatState.STARTING, CurrentOperation.COOLING): HVACAction.COOLING,
+    (ThermostatState.HEATING, CurrentOperation.HEATING): HVACAction.HEATING,
+    (ThermostatState.COOLING, CurrentOperation.COOLING): HVACAction.COOLING,
+    (ThermostatState.STOPPING, CurrentOperation.HEATING): HVACAction.HEATING,
+    (ThermostatState.STOPPING, CurrentOperation.COOLING): HVACAction.COOLING,
+}
+
+
+def _duration_to_seconds(duration: dict[str, float]) -> float:
+    return timedelta(**duration).total_seconds()
 
 
 async def async_setup_entry(
@@ -31,8 +61,18 @@ async def async_setup_entry(
             SmartThermostatClimateEntity(
                 thermostat_controller=entry.runtime_data.thermostat_controller,
                 runtime_context_factory=entry.runtime_data.runtime_context_factory,
+                state_machine=entry.runtime_data.state_machine,
                 unique_id=entry.entry_id,
                 name=entry.data[CONF_NAME],
+                indoor_temperature_sensor_entity_id=entry.data[CONF_INDOOR_TEMPERATURE_SENSOR],
+                indoor_humidity_sensor_entity_id=entry.data.get(CONF_INDOOR_HUMIDITY_SENSOR),
+                instantaneous_energy_surplus_entity_id=entry.data[CONF_INSTANTANEOUS_ENERGY_SURPLUS],
+                minimum_energy_surplus_entity_id=entry.data[CONF_MINIMUM_ENERGY_SURPLUS],
+                hysteresis=entry.data[CONF_THERMOSTAT_TOLERANCE],
+                minimum_device_runtime=_duration_to_seconds(entry.data[CONF_MINIMUM_DEVICE_RUNTIME]),
+                minimum_source_runtime=_duration_to_seconds(entry.data[CONF_MINIMUM_SOURCE_RUNTIME]),
+                shutdown_delay=_duration_to_seconds(entry.data[CONF_SHUTDOWN_DELAY]),
+                source_change_delay=_duration_to_seconds(entry.data[CONF_SOURCE_CHANGE_DELAY]),
             )
         ]
     )
@@ -57,11 +97,32 @@ class SmartThermostatClimateEntity(ClimateEntity):
         self,
         thermostat_controller: ThermostatController,
         runtime_context_factory: RuntimeContextFactory,
+        state_machine: StateMachine,
         unique_id: str,
         name: str,
+        indoor_temperature_sensor_entity_id: str,
+        indoor_humidity_sensor_entity_id: str | None,
+        instantaneous_energy_surplus_entity_id: str,
+        minimum_energy_surplus_entity_id: str,
+        hysteresis: float,
+        minimum_device_runtime: float,
+        minimum_source_runtime: float,
+        shutdown_delay: float,
+        source_change_delay: float,
     ) -> None:
         self._thermostat_controller = thermostat_controller
         self._runtime_context_factory = runtime_context_factory
+        self._state_machine = state_machine
+
+        self._indoor_temperature_sensor_entity_id = indoor_temperature_sensor_entity_id
+        self._indoor_humidity_sensor_entity_id = indoor_humidity_sensor_entity_id
+        self._instantaneous_energy_surplus_entity_id = instantaneous_energy_surplus_entity_id
+        self._minimum_energy_surplus_entity_id = minimum_energy_surplus_entity_id
+        self._hysteresis = hysteresis
+        self._minimum_device_runtime = minimum_device_runtime
+        self._minimum_source_runtime = minimum_source_runtime
+        self._shutdown_delay = shutdown_delay
+        self._source_change_delay = source_change_delay
 
         # General
         self._attr_name: str | None = name
@@ -111,5 +172,67 @@ class SmartThermostatClimateEntity(ClimateEntity):
 
         if ATTR_TARGET_TEMP_LOW in kwargs:
             self._attr_target_temperature_low = kwargs[ATTR_TARGET_TEMP_LOW]
+
+        self.async_write_ha_state()
+
+    def _read_required_value(self, entity_id: str) -> float | None:
+        state = self.hass.states.get(entity_id)
+
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+
+        try:
+            return float(state.state)
+        except ValueError:
+            return None
+
+    def _read_optional_value(self, entity_id: str | None) -> float | None:
+        if entity_id is None:
+            return None
+
+        return self._read_required_value(entity_id)
+
+    async def async_evaluate(self) -> None:
+        current_temperature = self._read_required_value(self._indoor_temperature_sensor_entity_id)
+        instantaneous_energy_surplus = self._read_required_value(self._instantaneous_energy_surplus_entity_id)
+        minimum_energy_surplus = self._read_required_value(self._minimum_energy_surplus_entity_id)
+        heating_target_temperature = self._attr_target_temperature_low
+        cooling_target_temperature = self._attr_target_temperature_high
+
+        if (
+            current_temperature is None
+            or instantaneous_energy_surplus is None
+            or minimum_energy_surplus is None
+            or heating_target_temperature is None
+            or cooling_target_temperature is None
+        ):
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
+
+        current_humidity = self._read_optional_value(self._indoor_humidity_sensor_entity_id)
+
+        context = self._runtime_context_factory.create(
+            current_state=self._state_machine.current_state,
+            current_temperature=current_temperature,
+            current_humidity=current_humidity,
+            heating_target_temperature=heating_target_temperature,
+            cooling_target_temperature=cooling_target_temperature,
+            hysteresis=self._hysteresis,
+            instantaneous_energy_surplus=instantaneous_energy_surplus,
+            minimum_energy_surplus=minimum_energy_surplus,
+            now=time.monotonic(),
+            minimum_device_runtime=self._minimum_device_runtime,
+            minimum_source_runtime=self._minimum_source_runtime,
+            shutdown_delay=self._shutdown_delay,
+            source_change_delay=self._source_change_delay,
+        )
+
+        result = self._thermostat_controller.evaluate(context)
+
+        self._attr_available = True
+        self._attr_current_temperature = current_temperature
+        self._attr_current_humidity = current_humidity
+        self._attr_hvac_action = _HVAC_ACTION_MAP[(result.current_state, result.current_operation)]
 
         self.async_write_ha_state()

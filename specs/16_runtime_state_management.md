@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Management
 
-Version: 1.1
+Version: 1.2
 
 Status: Frozen
 
@@ -56,6 +56,15 @@ The integration never modifies its contents.
 The Thermostat Controller is the only component authorized to modify the Thermostat Runtime State.
 
 No other component may update its contents.
+
+This includes every persistent runtime field, including:
+
+- Current Heating Source;
+- Current Operation;
+- Device Started At;
+- Demand Ended At;
+- Source Selected At;
+- Desired Source Differs Since.
 
 In particular:
 
@@ -127,6 +136,8 @@ No runtime information survives integration unloading.
 # 9. Design Principles
 
 The Thermostat Runtime State is the single source of truth for persistent runtime information.
+
+This includes every runtime value that must survive across multiple evaluation cycles.
 
 The Runtime Context is a temporary immutable snapshot built from:
 
