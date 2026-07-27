@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Update Rules
 
-Version: 1.0
+Version: 1.1
 
 Status: Frozen
 
@@ -24,7 +24,7 @@ No implementation shall infer update rules not explicitly documented here.
 
 The Thermostat Runtime State is updated only by the Thermostat Controller.
 
-Updates occur only after the evaluation has completed.
+Updates occur only after the evaluation has completed successfully.
 
 The Runtime Context is never modified.
 
@@ -32,102 +32,102 @@ The Runtime Context represents the input snapshot.
 
 The Thermostat Runtime State represents the persistent state after the evaluation.
 
+Updates are expressed in terms of domain events rather than specific State Machine transitions.
+
 ---
 
 # 3. Current Heating Source
 
 ## Update
 
-The Current Heating Source SHALL be updated whenever the Thermostat Controller authorizes a heating source change.
+Update the Current Heating Source whenever a heating source change is authorized and becomes effective.
 
-The new value becomes the requested heating source.
+The new value SHALL be the newly active heating source.
 
-## No Update
+## Preserve
 
-If the requested heating source is denied by the Protection Engine, the Current Heating Source remains unchanged.
+Preserve the current value while the active heating source does not change.
+
+## Reset
+
+The Current Heating Source is never reset independently.
 
 ---
 
 # 4. Device Started At
 
-This timestamp records when the currently active heating or cooling device started operating.
+This timestamp records when the currently controlled heating or cooling device becomes operational.
 
 ## Update
 
 Update the timestamp when:
 
-- the thermostat transitions from STARTING to HEATING;
-- the thermostat transitions from STARTING to COOLING.
+- a heating device becomes active;
+- a cooling device becomes active.
 
 The value SHALL be the current monotonic time.
 
 ## Preserve
 
-Keep the existing value while the same device continues operating.
+Preserve the timestamp while the same device continues operating.
 
 ## Reset
 
-Reset the value when:
-
-- the thermostat reaches IDLE;
-- the thermostat transitions to OFF.
+Reset the timestamp when no heating or cooling device remains active.
 
 ---
 
 # 5. Demand Ended At
 
-This timestamp records when thermal demand disappeared.
+This timestamp records when thermal demand disappears.
 
 ## Update
 
-Update the timestamp when the Demand Engine changes from:
-
-- HEATING → NO_DEMAND
-- COOLING → NO_DEMAND
+Update the timestamp when thermal demand changes from an active demand to NO_DEMAND.
 
 The value SHALL be the current monotonic time.
 
 ## Preserve
 
-Keep the existing value while no new demand change occurs.
+Preserve the timestamp while thermal demand remains absent.
 
 ## Reset
 
-Reset the value when a new heating or cooling demand begins.
+Reset the timestamp when a new heating or cooling demand begins.
 
 ---
 
 # 6. Source Selected At
 
-This timestamp records when the active heating source became active.
+This timestamp records when the currently active heating source became active.
 
 ## Update
 
-Update the timestamp whenever a heating source change is authorized.
+Update the timestamp whenever a heating source change becomes effective.
 
 The value SHALL be the current monotonic time.
 
 ## Preserve
 
-Keep the existing value while the same heating source remains active.
+Preserve the timestamp while the same heating source remains active.
 
 ## Reset
 
-Never reset independently.
+This timestamp is never reset independently.
 
-It changes only when a new source becomes active.
+It changes only when another heating source becomes active.
 
 ---
 
 # 7. Desired Source Differs Since
 
-This timestamp records when the preferred heating source first became different from the active heating source.
+This timestamp records when the preferred heating source first became different from the currently active heating source.
 
 ## Update
 
 If:
 
-Requested Heating Source ≠ Current Heating Source
+- Requested Heating Source ≠ Current Heating Source
 
 and no timestamp is currently stored,
 
@@ -135,23 +135,23 @@ store the current monotonic time.
 
 ## Preserve
 
-If the requested heating source remains different, preserve the original timestamp.
+Preserve the timestamp while the requested heating source continues to differ from the active heating source.
 
 ## Reset
 
 Reset the timestamp immediately when:
 
-Requested Heating Source = Current Heating Source.
+- Requested Heating Source = Current Heating Source.
 
 ---
 
 # 8. Atomic Update
 
-All Runtime State updates belonging to one evaluation cycle SHALL be committed together.
+All Runtime State updates belonging to a single evaluation cycle SHALL be committed atomically.
 
 Partial updates are not allowed.
 
-If the evaluation fails, the Thermostat Runtime State shall remain unchanged.
+If the evaluation fails, the Thermostat Runtime State SHALL remain unchanged.
 
 ---
 
@@ -159,9 +159,9 @@ If the evaluation fails, the Thermostat Runtime State shall remain unchanged.
 
 The Protection Engine never updates the Thermostat Runtime State.
 
-It only evaluates the timestamps already stored.
+It only evaluates the existing runtime information.
 
-The Thermostat Controller applies the updates after the evaluation has completed.
+The Thermostat Controller applies Runtime State updates after the evaluation has completed successfully.
 
 ---
 
@@ -171,7 +171,7 @@ The Runtime Context contains a snapshot of the Thermostat Runtime State taken be
 
 The Runtime Context never reflects updates performed during the current evaluation.
 
-Updated values become visible only in the next evaluation cycle.
+Updated Runtime State values become visible only during the next evaluation cycle.
 
 ---
 

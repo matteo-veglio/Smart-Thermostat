@@ -12,6 +12,7 @@ from .runtime_data import SmartThermostatConfigEntry, SmartThermostatRuntimeData
 from .source_engine import SourceEngine
 from .state_machine import StateMachine, ThermostatState
 from .thermostat_controller import ThermostatController
+from .thermostat_runtime_state import ThermostatRuntimeState
 from .transition_table import TransitionTable
 
 PLATFORMS: list[Platform] = [Platform.CLIMATE]
@@ -23,6 +24,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: SmartThermostatConfigEntry) -> bool:
     state_machine = StateMachine(ThermostatState.OFF)
+    runtime_state = ThermostatRuntimeState()
 
     thermostat_controller = ThermostatController(
         state_machine=state_machine,
@@ -30,12 +32,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: SmartThermostatConfigEnt
         source_engine=SourceEngine(),
         protection_engine=ProtectionEngine(),
         transition_table=TransitionTable(),
+        runtime_state=runtime_state,
     )
 
     entry.runtime_data = SmartThermostatRuntimeData(
         state_machine=state_machine,
+        runtime_state=runtime_state,
         thermostat_controller=thermostat_controller,
-        runtime_context_factory=RuntimeContextFactory(),
+        runtime_context_factory=RuntimeContextFactory(runtime_state=runtime_state),
         boiler_controller=BoilerController(hass, entry.data[CONF_HEATING_SOURCE_1]),
         heating_climate_controller=ClimateController(hass, entry.data[CONF_HEATING_SOURCE_2]),
         cooling_climate_controller=ClimateController(hass, entry.data[CONF_COOLING_SOURCE]),

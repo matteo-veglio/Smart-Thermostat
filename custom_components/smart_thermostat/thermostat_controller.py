@@ -5,6 +5,7 @@ from .protection_engine import Permission, ProtectionEngine
 from .runtime_context import RuntimeContext
 from .source_engine import HeatingSource, SourceEngine
 from .state_machine import StateMachine, ThermostatState
+from .thermostat_runtime_state import ThermostatRuntimeState
 from .transition_table import TransitionTable
 
 
@@ -26,12 +27,14 @@ class ThermostatController:
         source_engine: SourceEngine,
         protection_engine: ProtectionEngine,
         transition_table: TransitionTable,
+        runtime_state: ThermostatRuntimeState,
     ) -> None:
         self._state_machine = state_machine
         self._demand_engine = demand_engine
         self._source_engine = source_engine
         self._protection_engine = protection_engine
         self._transition_table = transition_table
+        self._runtime_state = runtime_state
 
     def evaluate(self, context: RuntimeContext) -> ThermostatControllerResult:
         current_state = context.current_state
@@ -40,6 +43,7 @@ class ThermostatController:
 
         protection_result: Permission | None = None
         requested_heating_source: HeatingSource | None = None
+        source_change_effective = False
 
         if demand == Demand.HEATING:
             requested_heating_source = self._source_engine.evaluate_source(context)
@@ -49,10 +53,15 @@ class ThermostatController:
 
                 if source_runtime_permission == Permission.ALLOWED:
                     protection_result = self._protection_engine.evaluate_source_change_delay(context)
+
+                    if protection_result == Permission.ALLOWED:
+                        source_change_effective = True
                 else:
                     protection_result = source_runtime_permission
 
         requested_state = self._transition_table.resolve_requested_state(current_state, demand)
+
+        device_stopped = False
 
         if requested_state != current_state:
             if current_state == ThermostatState.STOPPING and requested_state == ThermostatState.IDLE:
@@ -65,8 +74,19 @@ class ThermostatController:
 
                 if protection_result == Permission.ALLOWED:
                     self._state_machine.transition_to(requested_state)
+                    device_stopped = True
             else:
                 self._state_machine.transition_to(requested_state)
+
+        self._update_runtime_state(
+            context=context,
+            current_state=current_state,
+            demand=demand,
+            requested_state=requested_state,
+            requested_heating_source=requested_heating_source,
+            source_change_effective=source_change_effective,
+            device_stopped=device_stopped,
+        )
 
         return ThermostatControllerResult(
             demand=demand,
@@ -76,3 +96,49 @@ class ThermostatController:
             requested_state=requested_state,
             protection_result=protection_result,
         )
+
+    def _update_runtime_state(
+        self,
+        *,
+        context: RuntimeContext,
+        current_state: ThermostatState,
+        demand: Demand,
+        requested_state: ThermostatState,
+        requested_heating_source: HeatingSource | None,
+        source_change_effective: bool,
+        device_stopped: bool,
+    ) -> None:
+        # specs/15_runtime_state_update_rules.md §3 Current Heating Source
+        # specs/15_runtime_state_update_rules.md §6 Source Selected At
+        if source_change_effective:
+            self._runtime_state.current_heating_source = requested_heating_source
+            self._runtime_state.source_selected_at = context.now
+
+        # specs/15_runtime_state_update_rules.md §7 Desired Source Differs Since
+        if requested_heating_source is not None:
+            effective_current_heating_source = (
+                requested_heating_source if source_change_effective else context.current_heating_source
+            )
+
+            if requested_heating_source != effective_current_heating_source:
+                if self._runtime_state.desired_source_differs_since == 0.0:
+                    self._runtime_state.desired_source_differs_since = context.now
+            else:
+                self._runtime_state.desired_source_differs_since = 0.0
+        else:
+            self._runtime_state.desired_source_differs_since = 0.0
+
+        # specs/15_runtime_state_update_rules.md §5 Demand Ended At
+        if current_state in (ThermostatState.HEATING, ThermostatState.COOLING) and demand == Demand.NO_DEMAND:
+            self._runtime_state.demand_ended_at = context.now
+        elif requested_state == ThermostatState.STARTING:
+            self._runtime_state.demand_ended_at = 0.0
+
+        # specs/15_runtime_state_update_rules.md §4 Device Started At
+        if current_state == ThermostatState.STARTING and requested_state in (
+            ThermostatState.HEATING,
+            ThermostatState.COOLING,
+        ):
+            self._runtime_state.device_started_at = context.now
+        elif device_stopped:
+            self._runtime_state.device_started_at = 0.0

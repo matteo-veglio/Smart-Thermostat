@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Management
 
-Version: 1.0
+Version: 1.1
 
 Status: Frozen
 
@@ -10,9 +10,9 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines how the Thermostat Runtime State is created, owned, shared and destroyed.
+This document defines how the Thermostat Runtime State is created, stored, shared and destroyed.
 
-It specifies the lifecycle of the runtime state within the Smart Thermostat integration.
+It also defines ownership of the runtime state instance and modification responsibilities.
 
 The Thermostat Runtime State is part of the integration runtime.
 
@@ -20,42 +20,54 @@ It is not part of the Runtime Context.
 
 ---
 
-# 2. Creation
+# 2. Instance Lifecycle
 
 Exactly one Thermostat Runtime State SHALL exist for each thermostat instance.
 
-The Thermostat Runtime State SHALL be created during the integration setup.
-
-Creation occurs inside:
+The instance SHALL be created during:
 
 - async_setup_entry()
 
-The Thermostat Runtime State SHALL be initialized with its default values.
+The instance SHALL be initialized with its default values.
+
+The same instance SHALL be reused throughout the lifetime of the integration.
 
 ---
 
-# 3. Ownership
+# 3. Instance Ownership
 
-The Thermostat Runtime State is owned by the Smart Thermostat integration.
+The Smart Thermostat integration owns the Thermostat Runtime State instance.
 
-The integration keeps exactly one shared instance.
+The instance SHALL be stored inside the integration runtime data.
 
-The Thermostat Controller is the only component allowed to modify it.
+The integration is responsible for:
 
-All other components shall treat it as read-only.
+- creating the instance;
+- storing the instance;
+- sharing the instance with authorized components;
+- releasing the instance during integration unload.
+
+The integration never modifies its contents.
 
 ---
 
-# 4. Storage
+# 4. Modification Ownership
 
-The Thermostat Runtime State SHALL be stored inside the integration runtime data.
+The Thermostat Controller is the only component authorized to modify the Thermostat Runtime State.
 
-It SHALL be available to:
+No other component may update its contents.
 
-- Runtime Context Factory (read-only)
-- Thermostat Controller (read/write)
+In particular:
 
-No other component shall require direct access.
+- Runtime Context Factory: read-only
+- Climate Entity: read-only
+- Device Controllers: no access
+- State Machine: no access
+- Domain Engines: no access
+
+The Thermostat Controller SHALL apply updates according to:
+
+- specs/15_runtime_state_update_rules.md
 
 ---
 
@@ -72,7 +84,7 @@ For every evaluation cycle:
 
 3. The Runtime Context is passed to the Thermostat Controller.
 
-The Runtime Context contains a snapshot of the Thermostat Runtime State.
+The Runtime Context contains a snapshot of the current Thermostat Runtime State.
 
 ---
 
@@ -83,21 +95,20 @@ During the evaluation:
 - the Runtime Context remains immutable;
 - the Thermostat Runtime State remains unchanged.
 
-Only after the evaluation has completed successfully may the Thermostat Controller update the Thermostat Runtime State according to:
+Only after the evaluation has completed successfully may the Thermostat Controller update the Thermostat Runtime State.
 
-- specs/15_runtime_state_update_rules.md
+The Runtime Context is never updated after creation.
 
 ---
 
 # 7. Failed Evaluation
 
-If the evaluation fails for any reason:
+If the evaluation fails:
 
 - the Runtime Context is discarded;
-- the Thermostat Runtime State SHALL NOT be modified;
-- the previous Thermostat Runtime State remains valid.
+- the Thermostat Runtime State SHALL remain unchanged.
 
-Partial updates are not allowed.
+Partial Runtime State updates are not allowed.
 
 ---
 
@@ -107,9 +118,9 @@ During:
 
 - async_unload_entry()
 
-the Thermostat Runtime State SHALL be released together with all other integration runtime objects.
+the integration releases the Thermostat Runtime State instance together with all other runtime objects.
 
-No runtime state survives unloading the integration.
+No runtime information survives integration unloading.
 
 ---
 
@@ -117,15 +128,21 @@ No runtime state survives unloading the integration.
 
 The Thermostat Runtime State is the single source of truth for persistent runtime information.
 
-The Runtime Context is a temporary snapshot created from:
+The Runtime Context is a temporary immutable snapshot built from:
 
-- Home Assistant;
-- Config Entry;
+- Home Assistant runtime information;
+- Config Entry values;
 - Thermostat Runtime State.
 
 The Runtime Context never owns persistent information.
 
 The Thermostat Runtime State never contains Home Assistant objects.
+
+Instance ownership and modification ownership are intentionally separated.
+
+The integration owns the lifetime of the instance.
+
+The Thermostat Controller owns every modification of its contents.
 
 ---
 
