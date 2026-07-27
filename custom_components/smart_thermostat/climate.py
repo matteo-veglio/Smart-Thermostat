@@ -23,8 +23,9 @@ from homeassistant.const import (
     STATE_UNKNOWN,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .boiler_controller import BoilerController
 from .climate_controller import ClimateController
@@ -59,6 +60,9 @@ from .thermostat_controller import ThermostatController, ThermostatControllerRes
 from .thermostat_runtime_state import CurrentOperation
 
 PRESET_NIGHT = "night"
+
+_DEFAULT_HEATING_TARGET_TEMPERATURE = 20.0
+_DEFAULT_COOLING_TARGET_TEMPERATURE = 26.0
 
 _HVAC_ACTION_MAP: dict[tuple[ThermostatState, CurrentOperation], HVACAction] = {
     (ThermostatState.OFF, CurrentOperation.NONE): HVACAction.OFF,
@@ -177,15 +181,42 @@ class SmartThermostatClimateEntity(ClimateEntity):
         # Temperature
         self._attr_current_temperature: float | None = None
         self._attr_current_humidity: float | None = None
-        self._attr_target_temperature_high: float | None = None
-        self._attr_target_temperature_low: float | None = None
+        self._attr_target_temperature_high: float = _DEFAULT_COOLING_TARGET_TEMPERATURE
+        self._attr_target_temperature_low: float = _DEFAULT_HEATING_TARGET_TEMPERATURE
 
         # HVAC
-        self._attr_hvac_mode: HVACMode | None = None
+        self._attr_hvac_mode: HVACMode = HVACMode.OFF
         self._attr_hvac_action: HVACAction | None = None
 
         # Presets
         self._attr_preset_mode: str | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        tracked_entity_ids = [
+            self._indoor_temperature_sensor_entity_id,
+            self._instantaneous_energy_surplus_entity_id,
+            self._minimum_energy_surplus_entity_id,
+            self._boiler_entity_id,
+            self._climate_entity_id,
+        ]
+
+        if self._indoor_humidity_sensor_entity_id is not None:
+            tracked_entity_ids.append(self._indoor_humidity_sensor_entity_id)
+
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass,
+                tracked_entity_ids,
+                self._async_handle_tracked_state_change,
+            )
+        )
+
+        await self.async_evaluate()
+
+    async def _async_handle_tracked_state_change(self, event: Event[EventStateChangedData]) -> None:
+        await self.async_evaluate()
 
     @property
     def temperature_unit(self) -> str:
