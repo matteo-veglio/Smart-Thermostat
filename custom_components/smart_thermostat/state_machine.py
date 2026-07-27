@@ -5,11 +5,9 @@ class ThermostatState(Enum):
     OFF = "off"
     IDLE = "idle"
     STARTING = "starting"
-    HEATING_BOILER = "heating_boiler"
-    HEATING_AC = "heating_ac"
-    DELAY_OFF_HEATING = "delay_off_heating"
-    COOLING_AC = "cooling_ac"
-    DELAY_OFF_COOLING = "delay_off_cooling"
+    HEATING = "heating"
+    COOLING = "cooling"
+    STOPPING = "stopping"
 
 
 class InvalidStateTransitionError(Exception):
@@ -21,50 +19,17 @@ class InvalidStateTransitionError(Exception):
 
 _ALLOWED_TRANSITIONS: dict[ThermostatState, frozenset[ThermostatState]] = {
     ThermostatState.OFF: frozenset({ThermostatState.IDLE}),
-    ThermostatState.IDLE: frozenset({ThermostatState.STARTING, ThermostatState.OFF}),
+    ThermostatState.IDLE: frozenset({ThermostatState.OFF, ThermostatState.STARTING}),
     ThermostatState.STARTING: frozenset(
         {
-            ThermostatState.HEATING_BOILER,
-            ThermostatState.HEATING_AC,
-            ThermostatState.COOLING_AC,
+            ThermostatState.HEATING,
+            ThermostatState.COOLING,
             ThermostatState.OFF,
         }
     ),
-    ThermostatState.HEATING_BOILER: frozenset(
-        {
-            ThermostatState.DELAY_OFF_HEATING,
-            ThermostatState.STARTING,
-            ThermostatState.OFF,
-        }
-    ),
-    ThermostatState.HEATING_AC: frozenset(
-        {
-            ThermostatState.DELAY_OFF_HEATING,
-            ThermostatState.STARTING,
-            ThermostatState.OFF,
-        }
-    ),
-    ThermostatState.DELAY_OFF_HEATING: frozenset(
-        {
-            ThermostatState.HEATING_BOILER,
-            ThermostatState.HEATING_AC,
-            ThermostatState.IDLE,
-            ThermostatState.OFF,
-        }
-    ),
-    ThermostatState.COOLING_AC: frozenset(
-        {
-            ThermostatState.DELAY_OFF_COOLING,
-            ThermostatState.OFF,
-        }
-    ),
-    ThermostatState.DELAY_OFF_COOLING: frozenset(
-        {
-            ThermostatState.COOLING_AC,
-            ThermostatState.IDLE,
-            ThermostatState.OFF,
-        }
-    ),
+    ThermostatState.HEATING: frozenset({ThermostatState.STOPPING}),
+    ThermostatState.COOLING: frozenset({ThermostatState.STOPPING}),
+    ThermostatState.STOPPING: frozenset({ThermostatState.IDLE, ThermostatState.OFF}),
 }
 
 
