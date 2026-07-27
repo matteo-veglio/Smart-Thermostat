@@ -10,337 +10,475 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines the development plan of the Smart Thermostat.
+This document defines the official implementation plan of the Smart Thermostat.
 
-Development is divided into small, independent tasks.
+Development is divided into small, independent and sequential tasks.
 
 Each task has a single objective.
 
-Tasks shall be implemented sequentially.
-
-A new task shall never start before the current task has been completed and validated.
+Tasks shall never overlap.
 
 ---
 
 # 2. General Rules
 
-Every task shall follow the rules defined in:
+Every task shall follow:
 
 - 08_llm_development_guidelines.md
 
-Before implementing a task, the LLM shall read every referenced document.
+Before starting a task, the LLM shall read every referenced specification.
 
-Only the files explicitly listed by the task may be modified.
+Only the listed files may be modified.
 
 The LLM shall never anticipate future tasks.
 
----
-
-# Task 01
-
-## Title
-
-Create Integration Skeleton
-
-### Objective
-
-Create the initial Smart Thermostat integration structure.
-
-### Documentation
-
-- 01_project_overview.md
-- 03_architecture.md
-- 08_llm_development_guidelines.md
-
-### Files
-
-Create:
-
-- custom_components/smart_thermostat/
-- __init__.py
-- manifest.json
-- const.py
-
-### Acceptance Criteria
-
-- Integration loads correctly.
-- No runtime errors.
-- No business logic implemented.
+A task is complete only when every acceptance criterion is satisfied.
 
 ---
 
-# Task 02
+# Task Template
 
-## Title
+Every task shall contain the following sections.
 
-Implement Config Flow
-
-### Objective
-
-Implement the complete Home Assistant Config Flow.
-
-### Documentation
-
-- 02_functional_specification.md
-- 07_configuration.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Every configuration parameter is supported.
-- Validation is implemented.
-- No business logic is implemented.
+- Title
+- Objective
+- Documentation
+- Files to Create
+- Files to Modify
+- Implementation Scope
+- Acceptance Criteria
+- Out of Scope
 
 ---
 
-# Task 03
+# Phase 1 — Integration Skeleton
 
-## Title
+## Task 01
 
-Implement Climate Entity
+### Title
 
-### Objective
-
-Create the Climate Entity exposed to Home Assistant.
-
-### Documentation
-
-- 02_functional_specification.md
-- 07_configuration.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Climate Entity is fully operational.
-- All required properties are exposed.
-- No thermostat logic is implemented.
+Create integration folder structure.
 
 ---
 
-# Task 04
+## Task 02
 
-## Title
+### Title
 
-Implement State Machine
-
-### Objective
-
-Implement the internal State Machine.
-
-### Documentation
-
-- 04_state_machine.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Every documented state exists.
-- Every documented transition exists.
-- No undocumented transition exists.
+Create manifest.json.
 
 ---
 
-# Task 05
+## Task 03
 
-## Title
+### Title
 
-Implement Demand Engine
-
-### Objective
-
-Implement thermal demand evaluation.
-
-### Documentation
-
-- 05_control_algorithm.md
-- 06_decision_rules.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Heating demand implemented.
-- Cooling demand implemented.
-- Idle state implemented.
+Create constants module.
 
 ---
 
-# Task 06
+## Task 04
 
-## Title
+### Title
 
-Implement Source Engine
-
-### Objective
-
-Implement heating source selection.
-
-### Documentation
-
-- 05_control_algorithm.md
-- 06_decision_rules.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Desired Source correctly calculated.
-- No device commands generated.
+Create integration setup.
 
 ---
 
-# Task 07
+## Task 05
 
-## Title
+### Title
 
-Implement Protection Engine
-
-### Objective
-
-Implement every protection rule.
-
-### Documentation
-
-- 05_control_algorithm.md
-- 06_decision_rules.md
-- 07_configuration.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Shutdown Delay implemented.
-- Source Change Delay implemented.
-- Minimum Runtime implemented.
-- Minimum Source Runtime implemented.
+Validate integration loading.
 
 ---
 
-# Task 08
+# Phase 2 — Configuration
 
-## Title
+## Task 06
 
-Implement Boiler Controller
+### Title
 
-### Objective
-
-Implement boiler control.
-
-### Documentation
-
-- 03_architecture.md
-- 05_control_algorithm.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Boiler ON implemented.
-- Boiler OFF implemented.
+Create Config Flow skeleton.
 
 ---
 
-# Task 09
+## Task 07
 
-## Title
+### Title
 
-Implement Climate Controller
-
-### Objective
-
-Implement HVAC control.
-
-### Documentation
-
-- 03_architecture.md
-- 05_control_algorithm.md
-- 06_decision_rules.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- HVAC mode control implemented.
-- HVAC target temperature control implemented.
-- HVAC ON/OFF implemented.
+Implement General Configuration.
 
 ---
 
-# Task 10
+## Task 08
 
-## Title
+### Title
 
-Implement Device Controller
-
-### Objective
-
-Implement device command dispatching.
-
-### Documentation
-
-- 03_architecture.md
-- 05_control_algorithm.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Commands routed correctly.
-- No duplicated logic.
+Implement Device Configuration.
 
 ---
 
-# Task 11
+## Task 09
 
-## Title
+### Title
 
-Implement Thermostat Controller
-
-### Objective
-
-Implement the complete control cycle.
-
-### Documentation
-
-- 03_architecture.md
-- 04_state_machine.md
-- 05_control_algorithm.md
-- 06_decision_rules.md
-- 08_llm_development_guidelines.md
-
-### Acceptance Criteria
-
-- Complete control cycle implemented.
-- Components coordinated correctly.
+Implement Energy Configuration.
 
 ---
 
-# Task 12
+## Task 10
 
-## Title
+### Title
 
-Integration Testing
+Implement Protection Configuration.
 
-### Objective
+---
 
-Validate the complete Smart Thermostat.
+## Task 11
 
-### Documentation
+### Title
 
-All project documentation.
+Validate Config Flow.
 
-### Acceptance Criteria
+---
 
-- Every documented behaviour verified.
-- No undocumented behaviour.
-- No architecture violations.
-- No duplicated business logic.
-- Stable operation.
+# Phase 3 — Climate Entity
+
+## Task 12
+
+### Title
+
+Create Climate Entity skeleton.
+
+---
+
+## Task 13
+
+### Title
+
+Implement HVAC Mode.
+
+---
+
+## Task 14
+
+### Title
+
+Implement HVAC Action.
+
+---
+
+## Task 15
+
+### Title
+
+Implement Target Temperatures.
+
+---
+
+## Task 16
+
+### Title
+
+Implement Current Temperature.
+
+---
+
+## Task 17
+
+### Title
+
+Implement Current Humidity.
+
+---
+
+## Task 18
+
+### Title
+
+Implement Presets.
+
+---
+
+## Task 19
+
+### Title
+
+Validate Climate Entity.
+
+---
+
+# Phase 4 — State Machine
+
+## Task 20
+
+### Title
+
+Create State Enumeration.
+
+---
+
+## Task 21
+
+### Title
+
+Implement State Transitions.
+
+---
+
+## Task 22
+
+### Title
+
+Implement State Persistence.
+
+---
+
+## Task 23
+
+### Title
+
+Validate State Machine.
+
+---
+
+# Phase 5 — Demand Engine
+
+## Task 24
+
+### Title
+
+Implement Heating Demand.
+
+---
+
+## Task 25
+
+### Title
+
+Implement Cooling Demand.
+
+---
+
+## Task 26
+
+### Title
+
+Implement No Demand.
+
+---
+
+## Task 27
+
+### Title
+
+Validate Demand Engine.
+
+---
+
+# Phase 6 — Source Engine
+
+## Task 28
+
+### Title
+
+Implement Desired Source evaluation.
+
+---
+
+## Task 29
+
+### Title
+
+Implement Source Selection.
+
+---
+
+## Task 30
+
+### Title
+
+Validate Source Engine.
+
+---
+
+# Phase 7 — Protection Engine
+
+## Task 31
+
+### Title
+
+Implement Shutdown Delay.
+
+---
+
+## Task 32
+
+### Title
+
+Implement Minimum Device Runtime.
+
+---
+
+## Task 33
+
+### Title
+
+Implement Minimum Source Runtime.
+
+---
+
+## Task 34
+
+### Title
+
+Implement Source Change Delay.
+
+---
+
+## Task 35
+
+### Title
+
+Validate Protection Engine.
+
+---
+
+# Phase 8 — Device Controllers
+
+## Task 36
+
+### Title
+
+Implement Boiler Controller.
+
+---
+
+## Task 37
+
+### Title
+
+Implement Climate Controller.
+
+---
+
+## Task 38
+
+### Title
+
+Implement Device Controller.
+
+---
+
+## Task 39
+
+### Title
+
+Validate Device Controllers.
+
+---
+
+# Phase 9 — Thermostat Controller
+
+## Task 40
+
+### Title
+
+Create Thermostat Controller skeleton.
+
+---
+
+## Task 41
+
+### Title
+
+Implement Control Cycle.
+
+---
+
+## Task 42
+
+### Title
+
+Integrate Demand Engine.
+
+---
+
+## Task 43
+
+### Title
+
+Integrate Source Engine.
+
+---
+
+## Task 44
+
+### Title
+
+Integrate Protection Engine.
+
+---
+
+## Task 45
+
+### Title
+
+Integrate State Machine.
+
+---
+
+## Task 46
+
+### Title
+
+Integrate Device Controller.
+
+---
+
+## Task 47
+
+### Title
+
+Validate Thermostat Controller.
+
+---
+
+# Phase 10 — Integration Testing
+
+## Task 48
+
+### Title
+
+System Validation.
+
+---
+
+## Task 49
+
+### Title
+
+Regression Testing.
+
+---
+
+## Task 50
+
+### Title
+
+Release Candidate Validation.
 
 ---
 
 # 3. Task Completion Rules
 
-A task is considered complete only when:
+A task is complete only if:
 
-- every acceptance criterion is satisfied;
-- the implementation follows every frozen document;
+- all acceptance criteria are satisfied;
+- only the specified files have been modified;
 - no undocumented functionality has been introduced;
-- no future functionality has been anticipated.
+- no future functionality has been implemented.
 
 ---
 
@@ -348,6 +486,6 @@ A task is considered complete only when:
 
 This document defines the official implementation order of the Smart Thermostat.
 
-Development shall always follow the task order defined in this document.
+Tasks shall always be implemented sequentially.
 
-Tasks shall never be merged or reordered without explicitly updating this document.
+Tasks shall never be merged, reordered or skipped without explicitly updating this document.
