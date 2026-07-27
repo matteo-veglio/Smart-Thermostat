@@ -2,7 +2,7 @@
 
 ## Control Algorithm
 
-Version: 1.0
+Version: 2.0
 
 Status: Frozen
 
@@ -10,271 +10,136 @@ Status: Frozen
 
 # 1. Purpose
 
-This document defines the complete control algorithm of the Smart Thermostat.
+This document defines the thermal demand evaluation algorithm used by the Smart Thermostat.
 
-The algorithm specifies how the thermostat processes its inputs, determines the required operating strategy and generates commands for the controlled devices.
+The algorithm is implemented exclusively by the Demand Engine.
 
-The algorithm is deterministic.
+The Demand Engine evaluates only whether heating, cooling or no thermal demand currently exists.
 
-Given the same inputs and the same internal state, it shall always produce the same output.
+It never selects the heating source.
 
----
-
-# 2. Control Cycle
-
-The thermostat operates using a periodic control cycle.
-
-Each execution of the control cycle is completely independent.
-
-Every control cycle shall execute the following phases in the specified order.
-
-1. Read Inputs
-
-2. Evaluate Thermal Demand
-
-3. Evaluate State Machine
-
-4. Select Operating Strategy
-
-5. Select Heating Source
-
-6. Apply Protection Rules
-
-7. Generate Device Commands
-
-8. Update Climate Entity
-
-The execution order shall never change.
+It never evaluates protection logic.
 
 ---
 
-# 3. Read Inputs
+# 2. Inputs
 
-The thermostat shall read every configured entity.
+The Demand Engine receives the following inputs:
 
-The control algorithm shall never use cached entity values.
+| Input | Description |
+|--------|-------------|
+| Current Room Temperature | Current measured room temperature. |
+| Heating Target Temperature | User heating setpoint. |
+| Cooling Target Temperature | User cooling setpoint. |
+| Thermostat Hysteresis | Configured thermostat hysteresis. |
+| Current Thermostat State | Current logical state provided by the State Machine. |
 
-Every control cycle shall use the latest available Home Assistant state.
+The Current Thermostat State is read-only.
 
-The following values shall be acquired:
-
-- Indoor temperature
-- Indoor humidity
-- HVAC mode
-- Preset
-- Heating target temperature
-- Cooling target temperature
-- Instantaneous energy surplus
-- Minimum energy surplus
-- Current device states
+The Demand Engine shall never modify the State Machine.
 
 ---
 
-# 4. Evaluate Thermal Demand
+# 3. Outputs
 
-The thermostat shall determine whether thermal demand exists.
+The Demand Engine returns exactly one value:
 
-Possible outcomes are:
+- NO_DEMAND
+- HEATING
+- COOLING
 
-- Heating Required
-- Cooling Required
-- No Demand
-
-The thermal demand calculation is independent from every physical device.
-
-The thermal demand calculation shall not consider:
-
-- boiler state
-- air conditioner state
-- photovoltaic surplus
-- protection timers
+No other outputs are allowed.
 
 ---
 
-# 5. Evaluate State Machine
+# 4. Heating Algorithm
 
-The thermostat shall evaluate the current operating state.
+The algorithm behaves differently depending on the current thermostat state.
 
-The current state determines which transitions are allowed.
+## Heating Start
 
-The algorithm shall never bypass the State Machine.
+If the current thermostat state is NOT `HEATING`:
 
-State transitions are defined in:
+Heating demand begins when:
 
-04_state_machine.md
+```
+Current Temperature ≤ Heating Target − Hysteresis
+```
 
----
+## Heating Stop
 
-# 6. Select Operating Strategy
+If the current thermostat state is `HEATING`:
 
-The thermostat shall determine the required operating strategy.
+Heating demand ends when:
 
-Possible strategies are:
+```
+Current Temperature ≥ Heating Target
+```
 
-- Idle
-- Heating
-- Cooling
-
-Only one operating strategy may exist during a control cycle.
-
----
-
-# 7. Select Heating Source
-
-Heating source selection is executed only when the operating strategy is Heating.
-
-The algorithm shall evaluate the configured energy policy.
-
-Possible heating sources are:
-
-- Boiler
-- Air Conditioner
-
-Only one heating source may be selected.
-
-The selected heating source shall remain active until a valid source transition is permitted.
+Otherwise, the engine continues requesting HEATING.
 
 ---
 
-# 8. Apply Protection Rules
+# 5. Cooling Algorithm
 
-Before generating any command, the thermostat shall evaluate every protection rule.
+The algorithm behaves differently depending on the current thermostat state.
 
-Protection rules may temporarily prevent state transitions or device commands.
+## Cooling Start
 
-Protection rules include:
+If the current thermostat state is NOT `COOLING`:
 
-- minimum device runtime;
-- minimum source runtime;
-- shutdown delay;
-- source switching protection.
+Cooling demand begins when:
 
-Protection rules always have priority over operating requests.
+```
+Current Temperature ≥ Cooling Target + Hysteresis
+```
 
----
+## Cooling Stop
 
-# 9. Generate Device Commands
+If the current thermostat state is `COOLING`:
 
-The thermostat shall generate commands according to the selected operating strategy.
+Cooling demand ends when:
 
-Possible commands include:
+```
+Current Temperature ≤ Cooling Target
+```
 
-- Boiler ON
-- Boiler OFF
-- HVAC Mode
-- HVAC Target Temperature
-- HVAC OFF
-
-The generated commands depend on the active operating state.
+Otherwise, the engine continues requesting COOLING.
 
 ---
 
-# 10. Climate Regulation
+# 6. Idle Condition
 
-The air conditioner shall never regulate room temperature using its internal temperature sensor.
+If neither the heating nor cooling conditions are satisfied, the engine returns:
 
-Room temperature regulation is performed exclusively by the Smart Thermostat.
-
-The thermostat controls the air conditioner by adjusting its target temperature.
-
----
-
-# 11. Heating Control Curve
-
-Heating regulation shall use a discrete control curve.
-
-Input:
-
-Temperature Error
-
-Output:
-
-HVAC Target Temperature
-
-The algorithm shall evaluate the configured Heating Control Curve.
-
-The first matching interval shall be selected.
-
-The corresponding HVAC target temperature shall be applied.
-
-The control curve definition is part of the system configuration.
-
-The numerical values of the control curve are calibration parameters.
+```
+NO_DEMAND
+```
 
 ---
 
-# 12. Cooling Control Curve
+# 7. Responsibilities
 
-Cooling regulation shall use a discrete control curve.
+The Demand Engine SHALL:
 
-Input:
+- evaluate thermal demand;
+- apply thermostat hysteresis;
+- use the current thermostat state only to determine the correct hysteresis threshold;
+- return exactly one demand.
 
-Temperature Error
+The Demand Engine SHALL NOT:
 
-Output:
-
-HVAC Target Temperature
-
-The algorithm shall evaluate the configured Cooling Control Curve.
-
-The first matching interval shall be selected.
-
-The corresponding HVAC target temperature shall be applied.
-
-The control curve definition is part of the system configuration.
-
-The numerical values of the control curve are calibration parameters.
+- modify the State Machine;
+- select heating sources;
+- evaluate photovoltaic surplus;
+- execute timers;
+- execute protection logic;
+- communicate with Home Assistant.
 
 ---
 
-# 13. Command Optimization
+# 8. Source of Truth
 
-The thermostat shall never send unnecessary commands.
+This document is the only definition of the Smart Thermostat demand evaluation algorithm.
 
-A command shall only be generated when the requested operating value differs from the current operating value.
-
-Repeated identical commands are forbidden.
-
----
-
-# 14. Climate Entity Update
-
-At the end of every control cycle the Climate Entity shall be updated.
-
-The entity shall always represent the current operating state of the thermostat.
-
----
-
-# 15. Algorithm Principles
-
-The control algorithm shall satisfy the following principles.
-
-Deterministic
-
-The same inputs always generate the same outputs.
-
-Predictable
-
-Every decision follows documented rules.
-
-Stateless Decisions
-
-Every decision depends only on:
-
-- current inputs;
-- current configuration;
-- current State Machine state.
-
-Calibrated Behaviour
-
-Algorithm behaviour shall remain unchanged when calibration values are modified.
-
-Calibration parameters shall never change the structure of the algorithm.
-
----
-
-# 16. Source of Truth
-
-This document defines the complete operating algorithm of the Smart Thermostat.
-
-Any modification of the algorithm requires an explicit update of this document.
+Every implementation shall strictly follow this specification.

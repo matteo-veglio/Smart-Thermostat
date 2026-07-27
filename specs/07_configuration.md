@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Version: 1.0
+Version: 2.0
 
 Status: Frozen
 
@@ -229,21 +229,37 @@ Description
 
 Thermostat hysteresis.
 
+The hysteresis is evaluated by the Demand Engine together with the current logical thermostat state provided by the State Machine.
+
+The hysteresis is applied only when starting a new heating or cooling request.
+
+Once a request is active, it continues until the corresponding target temperature is reached.
+
 Heating Request starts when:
 
+```
 Current Temperature ≤ Heating Target − Tolerance
+```
 
 Heating Request ends when:
 
-Current Temperature ≥ Heating Target + Tolerance
+```
+Current Temperature ≥ Heating Target
+```
 
 Cooling Request starts when:
 
+```
 Current Temperature ≥ Cooling Target + Tolerance
+```
 
 Cooling Request ends when:
 
-Current Temperature ≤ Cooling Target − Tolerance
+```
+Current Temperature ≤ Cooling Target
+```
+
+This behaviour implements directional hysteresis and prevents unnecessary heating and cooling cycles while maintaining the desired target temperature.
 
 ---
 
@@ -273,7 +289,7 @@ Duration
 
 Description
 
-Minimum time the Desired Source must remain different from the Current Source before a source transition is allowed.
+Minimum time the desired heating source must remain different from the current heating source before a source transition is allowed.
 
 Purpose
 
@@ -309,7 +325,7 @@ Minimum time the selected heating source shall remain active before another heat
 
 Purpose
 
-Reduce unnecessary source changes.
+Reduce unnecessary heating source changes.
 
 ---
 

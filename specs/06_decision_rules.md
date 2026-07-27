@@ -2,7 +2,7 @@
 
 ## Decision Rules
 
-Version: 2.0
+Version: 2.1
 
 Status: Frozen
 
@@ -20,32 +20,36 @@ No component shall make decisions outside its responsibility.
 
 # 2. Demand Evaluation
 
-The Demand Engine evaluates the thermal demand.
+The Thermostat Controller requests the current thermal demand from the Demand Engine.
 
-Possible outputs are:
+The Demand Engine receives the following inputs:
+
+- current room temperature;
+- heating target temperature;
+- cooling target temperature;
+- thermostat hysteresis;
+- current thermostat state.
+
+The current thermostat state is provided by the State Machine and is used exclusively to determine whether the thermostat is already heating or cooling, allowing the Demand Engine to correctly apply directional hysteresis.
+
+The Demand Engine returns exactly one value:
 
 - NO_DEMAND
 - HEATING
 - COOLING
 
-The Demand Engine evaluates only:
+The Demand Engine never:
 
-- current room temperature;
-- heating target temperature;
-- cooling target temperature;
-- thermostat hysteresis.
-
-The Demand Engine never evaluates:
-
-- photovoltaic surplus;
-- heating source;
-- protection timers.
+- modifies the State Machine;
+- selects the heating source;
+- evaluates photovoltaic surplus;
+- evaluates protection rules.
 
 ---
 
 # 3. Heating Source Selection
 
-If the Demand Engine requests HEATING, the Thermostat Controller requests the heating source from the Source Engine.
+If the Demand Engine returns **HEATING**, the Thermostat Controller requests the heating source from the Source Engine.
 
 The Source Engine compares:
 
@@ -72,11 +76,13 @@ Otherwise:
 BOILER
 ```
 
+The Source Engine performs no other evaluations.
+
 ---
 
 # 4. Cooling Source
 
-Cooling always uses the configured air conditioner.
+If the Demand Engine returns **COOLING**, the cooling source is always the configured air conditioner.
 
 No source selection is required.
 
@@ -84,7 +90,7 @@ No source selection is required.
 
 # 5. Protection Validation
 
-Before applying any state or source change, the Thermostat Controller asks the Protection Engine whether the transition is allowed.
+Before applying any state transition or source change, the Thermostat Controller requests authorization from the Protection Engine.
 
 The Protection Engine evaluates:
 
@@ -93,39 +99,46 @@ The Protection Engine evaluates:
 - minimum device runtime;
 - minimum source runtime.
 
-The Protection Engine returns either:
+The Protection Engine returns exactly one result:
 
 - ALLOWED
 - DENIED
 
-It never changes the decision itself.
+The Protection Engine never changes the requested action.
+
+It only authorizes or rejects it.
 
 ---
 
 # 6. State Machine
 
-The Thermostat Controller updates the State Machine only after the Protection Engine has approved the transition.
+The State Machine stores only the logical operating state of the thermostat.
 
-The State Machine stores only the logical operating state.
+The Thermostat Controller is responsible for requesting state transitions.
 
-It never stores:
+The Demand Engine may read the current state in order to correctly apply thermostat hysteresis.
+
+The Demand Engine shall never modify the State Machine.
+
+The State Machine never stores:
 
 - heating source;
 - cooling source;
 - photovoltaic surplus;
-- timers.
+- timers;
+- controller decisions.
 
 ---
 
 # 7. Device Commands
 
-After all decisions have been completed:
+Once all decisions have been completed:
 
-1. Demand Engine determines the thermal demand.
-2. Source Engine selects the heating source (heating only).
-3. Protection Engine validates the transition.
-4. State Machine updates the logical operating state.
-5. Thermostat Controller dispatches commands to the appropriate Device Controller.
+1. The Demand Engine evaluates the thermal demand.
+2. If heating is required, the Source Engine selects the heating source.
+3. The Protection Engine validates the requested transition.
+4. The State Machine updates the logical operating state.
+5. The Thermostat Controller dispatches commands to the appropriate Device Controller.
 
 ---
 
@@ -133,15 +146,19 @@ After all decisions have been completed:
 
 Every engine answers exactly one question.
 
-| Engine | Question |
-|--------|----------|
-| Demand Engine | Is heating or cooling required? |
-| Source Engine | Which heating source shall be used? |
-| Protection Engine | Is the requested transition currently allowed? |
+| Engine | Responsibility |
+|--------|----------------|
+| Demand Engine | Is there a thermal demand? |
+| Source Engine | Which heating source should be used? |
+| Protection Engine | Is the requested transition allowed? |
 | State Machine | What is the current logical operating state? |
-| Thermostat Controller | How are all engines orchestrated? |
+| Thermostat Controller | Orchestrate all components. |
 
-No engine shall duplicate another engine's responsibility.
+The Demand Engine is the only component responsible for evaluating thermostat hysteresis.
+
+The State Machine is the only component responsible for storing the logical operating state.
+
+No component shall duplicate another component's responsibility.
 
 ---
 
