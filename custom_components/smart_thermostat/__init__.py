@@ -3,6 +3,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
 from .boiler_controller import BoilerController
+from .climate_control_table import DEFAULT_COOLING_TABLE, DEFAULT_HEATING_TABLE, ClimateControlTable
 from .climate_controller import ClimateController
 from .config_flow import CONF_COOLING_SOURCE, CONF_HEATING_SOURCE_1, CONF_HEATING_SOURCE_2
 from .demand_engine import DemandEngine
@@ -33,6 +34,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: SmartThermostatConfigEnt
         protection_engine=ProtectionEngine(),
         transition_table=TransitionTable(),
         runtime_state=runtime_state,
+        climate_control_table=ClimateControlTable(
+            heating_table=DEFAULT_HEATING_TABLE,
+            cooling_table=DEFAULT_COOLING_TABLE,
+        ),
     )
 
     entry.runtime_data = SmartThermostatRuntimeData(

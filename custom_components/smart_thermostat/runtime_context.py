@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from .device_action import ClimateHVACMode, PowerState
 from .source_engine import HeatingSource
 from .state_machine import ThermostatState
 from .thermostat_runtime_state import CurrentOperation
@@ -30,6 +31,12 @@ class RuntimeContext:
     demand_ended_at: float
     source_selected_at: float
     desired_source_differs_since: float
+
+    # Device State Snapshot
+    current_boiler_power_state: PowerState
+    current_climate_power_state: PowerState
+    current_climate_hvac_mode: ClimateHVACMode
+    current_climate_target_temperature: float
 
     # Protection Configuration
     now: float
