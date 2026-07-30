@@ -21,7 +21,7 @@ Unlike traditional thermostats, Smart Thermostat regulates the room temperature 
 - Boiler protection
 - Delayed shutdown
 - Delayed heating source switching
-- Presets (Away, Home, Night)
+- Presets (Away, Home, Sleep)
 
 ---
 

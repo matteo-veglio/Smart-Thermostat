@@ -17,11 +17,11 @@ class ProtectionEngine:
             context.now, context.desired_source_differs_since, context.source_change_delay
         )
 
-    def evaluate_minimum_device_runtime(self, context: RuntimeContext) -> Permission:
-        return self._evaluate_elapsed_time(context.now, context.device_started_at, context.minimum_device_runtime)
-
-    def evaluate_minimum_source_runtime(self, context: RuntimeContext) -> Permission:
-        return self._evaluate_elapsed_time(context.now, context.source_selected_at, context.minimum_source_runtime)
+    def evaluate_minimum_runtime(self, context: RuntimeContext) -> Permission:
+        # specs/12_controller_protection_workflow.md §3/§4: the single Minimum Runtime
+        # protection, anchored to when the currently active device started operating.
+        # Used both before stopping it and before replacing it with a different source.
+        return self._evaluate_elapsed_time(context.now, context.device_started_at, context.minimum_runtime)
 
     def _evaluate_elapsed_time(
         self,

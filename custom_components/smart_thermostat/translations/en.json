@@ -1,0 +1,154 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smart Thermostat - General",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "devices": {
+        "title": "Smart Thermostat - Devices",
+        "data": {
+          "climate_device": "Climate Device",
+          "boiler": "Boiler"
+        }
+      },
+      "energy": {
+        "title": "Smart Thermostat - Energy",
+        "data": {
+          "instantaneous_energy_surplus": "Instantaneous Energy Surplus Entity",
+          "minimum_energy_surplus": "Minimum Energy Surplus Entity"
+        }
+      },
+      "protection": {
+        "title": "Smart Thermostat - Protection",
+        "data": {
+          "thermostat_tolerance": "Thermostat Tolerance",
+          "shutdown_delay": "Shutdown Delay",
+          "source_change_delay": "Source Change Delay",
+          "minimum_runtime": "Minimum Runtime"
+        }
+      },
+      "climate_regulation": {
+        "title": "Smart Thermostat - Climate Regulation",
+        "data": {
+          "kp": "Proportional Gain (Kp)",
+          "ti": "Integral Time (Ti)",
+          "tt": "Anti-Windup Tracking Time (Tt)",
+          "ts": "Sampling Period (Ts)",
+          "tac_min": "Minimum Climate Device Temperature",
+          "tac_max": "Maximum Climate Device Temperature",
+          "enable_control_diagnostics": "Enable Control Diagnostics"
+        }
+      },
+      "preset_home": {
+        "title": "Smart Thermostat - Home Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      },
+      "preset_away": {
+        "title": "Smart Thermostat - Away Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      },
+      "preset_sleep": {
+        "title": "Smart Thermostat - Sleep Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "The selected entity could not be found.",
+      "invalid_numeric_entity": "The selected entity does not expose a valid numeric value."
+    }
+  },
+  "options": {
+    "step": {
+      "general": {
+        "title": "Smart Thermostat - General",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "devices": {
+        "title": "Smart Thermostat - Devices",
+        "data": {
+          "climate_device": "Climate Device",
+          "boiler": "Boiler"
+        }
+      },
+      "energy": {
+        "title": "Smart Thermostat - Energy",
+        "data": {
+          "instantaneous_energy_surplus": "Instantaneous Energy Surplus Entity",
+          "minimum_energy_surplus": "Minimum Energy Surplus Entity"
+        }
+      },
+      "protection": {
+        "title": "Smart Thermostat - Protection",
+        "data": {
+          "thermostat_tolerance": "Thermostat Tolerance",
+          "shutdown_delay": "Shutdown Delay",
+          "source_change_delay": "Source Change Delay",
+          "minimum_runtime": "Minimum Runtime"
+        }
+      },
+      "climate_regulation": {
+        "title": "Smart Thermostat - Climate Regulation",
+        "data": {
+          "kp": "Proportional Gain (Kp)",
+          "ti": "Integral Time (Ti)",
+          "tt": "Anti-Windup Tracking Time (Tt)",
+          "ts": "Sampling Period (Ts)",
+          "tac_min": "Minimum Climate Device Temperature",
+          "tac_max": "Maximum Climate Device Temperature",
+          "enable_control_diagnostics": "Enable Control Diagnostics"
+        }
+      },
+      "preset_home": {
+        "title": "Smart Thermostat - Home Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      },
+      "preset_away": {
+        "title": "Smart Thermostat - Away Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      },
+      "preset_sleep": {
+        "title": "Smart Thermostat - Sleep Preset",
+        "data": {
+          "heating_target": "Heating Target",
+          "cooling_target": "Cooling Target",
+          "temperature_entity": "Temperature Entity",
+          "humidity_entity": "Humidity Entity (optional)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "The selected entity could not be found.",
+      "invalid_numeric_entity": "The selected entity does not expose a valid numeric value."
+    }
+  }
+}

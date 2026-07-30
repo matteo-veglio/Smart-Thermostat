@@ -103,9 +103,8 @@ The selection algorithm is defined exclusively in:
 
 The thermostat protects connected devices by enforcing:
 
-- Minimum Device Runtime
+- Minimum Runtime
 - Shutdown Delay
-- Minimum Source Runtime
 - Source Change Delay
 
 Protection rules are defined exclusively in:

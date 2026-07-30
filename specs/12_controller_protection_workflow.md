@@ -2,7 +2,7 @@
 
 ## Thermostat Controller Protection Workflow
 
-Version: 1.1
+Version: 2.0
 
 Status: Frozen
 
@@ -91,7 +91,7 @@ The currently active device continues operating while the shutdown sequence is i
 
 Before leaving STOPPING, the Thermostat Controller SHALL verify:
 
-1. Minimum Device Runtime
+1. Minimum Runtime
 
 If the minimum runtime has not yet elapsed:
 
@@ -101,17 +101,35 @@ If the minimum runtime has elapsed:
 
 Continue.
 
-2. Shutdown Delay
+2. Shutdown Delay - Climate Device only
 
-If the shutdown delay has not yet expired:
+Shutdown Delay SHALL be evaluated only while the Climate Device is the active heating
+or cooling solution:
+
+- Cooling (always performed by the Climate Device);
+- Heating while the Climate Device is the active heating source.
+
+Shutdown Delay SHALL NOT be evaluated while the Boiler is the active heating source. In
+this case it is treated as immediately satisfied, and the transition to IDLE depends
+only on Minimum Runtime.
+
+If Shutdown Delay applies and has not yet expired:
 
 Remain in STOPPING.
 
-If the shutdown delay has expired:
+If Shutdown Delay applies and has expired, or does not apply:
 
 The transition to IDLE is allowed.
 
 Only after the transition to IDLE has been completed may the Thermostat Controller request the active device to stop.
+
+### Rationale for the Boiler exception
+
+Radiator-based Boiler heating already has significant thermal inertia. Keeping the
+Boiler active after thermal demand has disappeared would continue injecting heat into
+the system and cause unnecessary overshoot. Shutdown Delay therefore remains beneficial
+for the Climate Device (compressor cycling protection) but is intentionally not applied
+to the Boiler.
 
 ---
 
@@ -134,7 +152,7 @@ If the requested source differs from the current source:
 
 First evaluate:
 
-1. Minimum Source Runtime
+1. Minimum Runtime
 
 If denied:
 
@@ -164,15 +182,19 @@ Whenever multiple protections are required, they SHALL always be evaluated in th
 
 For shutdown:
 
-1. Minimum Device Runtime
-2. Shutdown Delay
+1. Minimum Runtime
+2. Shutdown Delay (Climate Device only - see §3)
 
 For heating source changes:
 
-1. Minimum Source Runtime
+1. Minimum Runtime
 2. Source Change Delay
 
 The evaluation order is fixed.
+
+Minimum Runtime is the same protection, and the same configured value, in both cases -
+it always answers the same question: has the currently active heating or cooling
+solution been active for long enough to be stopped or replaced.
 
 ---
 

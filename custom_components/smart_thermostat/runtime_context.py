@@ -40,7 +40,6 @@ class RuntimeContext:
 
     # Protection Configuration
     now: float
-    minimum_device_runtime: float
-    minimum_source_runtime: float
+    minimum_runtime: float
     shutdown_delay: float
     source_change_delay: float

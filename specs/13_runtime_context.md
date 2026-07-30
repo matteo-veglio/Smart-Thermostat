@@ -152,8 +152,7 @@ The Thermostat Runtime State contains only persistent domain information require
 ## Protection Configuration
 
 - Current Monotonic Time
-- Minimum Device Runtime
-- Minimum Source Runtime
+- Minimum Runtime
 - Shutdown Delay
 - Source Change Delay
 

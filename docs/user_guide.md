@@ -44,7 +44,7 @@ Smart Thermostat provides:
 - Boiler protection.
 - Delayed shutdown.
 - Source change protection.
-- Presets (Away, Home, Night).
+- Presets (Away, Home, Sleep).
 
 No custom dashboard cards are required.
 
@@ -133,7 +133,7 @@ The thermostat supports the following presets.
 
 - Away
 - Home
-- Night
+- Sleep
 
 Preset changes are managed externally by Home Assistant automations.
 

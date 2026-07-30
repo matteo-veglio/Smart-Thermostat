@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Version: 2.0
+Version: 3.0
 
 Status: Frozen
 
@@ -275,9 +275,16 @@ Description
 
 Time the currently operating device remains active after thermal demand disappears.
 
+This delay applies only while the Climate Device is the active heating or cooling
+solution (Heating via the Climate Device, or Cooling). It never applies while the
+Boiler is the active heating solution - the Boiler stops immediately once thermal
+demand disappears, subject only to Minimum Runtime.
+
 Purpose
 
-Prevent unnecessary compressor and boiler cycling.
+Prevent unnecessary compressor cycling. Radiator-based Boiler heating already has
+significant thermal inertia; keeping it running after demand has ended would only
+inject additional heat and cause unnecessary overshoot.
 
 ---
 
@@ -297,7 +304,7 @@ Ignore temporary photovoltaic fluctuations.
 
 ---
 
-## Minimum Device Runtime
+## Minimum Runtime
 
 Type
 
@@ -305,27 +312,13 @@ Duration
 
 Description
 
-Minimum operating time after a device has started.
+Minimum amount of time the currently active heating or cooling solution (Boiler or
+Climate Device) must remain active before it can be stopped or replaced by a
+different heating source.
 
 Purpose
 
 Protect compressors and boilers from excessive switching.
-
----
-
-## Minimum Source Runtime
-
-Type
-
-Duration
-
-Description
-
-Minimum time the selected heating source shall remain active before another heating source may be selected.
-
-Purpose
-
-Reduce unnecessary heating source changes.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Control Algorithm
 
-Version: 2.1
+Version: 2.2
 
 Status: Frozen
 
@@ -64,7 +64,32 @@ No other outputs are allowed.
 
 ---
 
-# 5. Heating Algorithm
+# 5. Symmetric Hysteresis Principle
+
+The Demand Engine implements a classic symmetric hysteresis (Schmitt Trigger) centred on
+each target temperature.
+
+Hysteresis is applied both when entering and when leaving Heating or Cooling.
+
+Once a Heating or Cooling demand has started, it SHALL remain active until the current
+temperature crosses the **opposite** hysteresis threshold - the threshold on the far
+side of the target from the one that started the demand.
+
+Crossing the target temperature alone SHALL NEVER terminate an active demand.
+
+The hysteresis band is therefore:
+
+```
+[ Target − Hysteresis , Target + Hysteresis ]
+```
+
+A demand that started because the temperature crossed one edge of this band remains
+active for as long as the temperature stays on the inside of the *other* edge, and
+terminates only once that other edge is crossed.
+
+---
+
+# 6. Heating Algorithm
 
 The algorithm behaves differently depending on the current thermostat state.
 
@@ -85,7 +110,17 @@ If the current thermostat state is `HEATING`:
 Heating demand continues while:
 
 ```
-Current Temperature < Heating Target
+Current Temperature < Heating Target + Hysteresis
+```
+
+## Heating Stop
+
+If the current thermostat state is `HEATING` and Heating Continue is not satisfied:
+
+Heating demand stops when:
+
+```
+Current Temperature ≥ Heating Target + Hysteresis
 ```
 
 Otherwise the Demand Engine returns:
@@ -96,7 +131,7 @@ NO_DEMAND
 
 ---
 
-# 6. Cooling Algorithm
+# 7. Cooling Algorithm
 
 The algorithm behaves differently depending on the current thermostat state.
 
@@ -117,7 +152,17 @@ If the current thermostat state is `COOLING`:
 Cooling demand continues while:
 
 ```
-Current Temperature > Cooling Target
+Current Temperature > Cooling Target − Hysteresis
+```
+
+## Cooling Stop
+
+If the current thermostat state is `COOLING` and Cooling Continue is not satisfied:
+
+Cooling demand stops when:
+
+```
+Current Temperature ≤ Cooling Target − Hysteresis
 ```
 
 Otherwise the Demand Engine returns:
@@ -128,7 +173,7 @@ NO_DEMAND
 
 ---
 
-# 7. Idle Condition
+# 8. Idle Condition
 
 If neither heating nor cooling conditions are satisfied:
 
@@ -140,7 +185,7 @@ is returned.
 
 ---
 
-# 8. Responsibilities
+# 9. Responsibilities
 
 The Demand Engine SHALL:
 
@@ -160,7 +205,7 @@ The Demand Engine SHALL NOT:
 
 ---
 
-# 9. Source of Truth
+# 10. Source of Truth
 
 This document defines the official demand evaluation algorithm of the Smart Thermostat.
 
