@@ -161,21 +161,32 @@ This pipeline runs independently of, and asynchronously from, every event listed
 
 # 6. Activation Conditions
 
-Climate Regulation - and therefore its dedicated 30-second scheduler (§11) - is
-considered active only when:
+Climate Regulation is active whenever the Climate Device is physically active - not
+merely when the logical Thermostat State is HEATING or COOLING. This distinction matters
+because the Climate Device is already commanded on during STARTING (specs/17_requested_
+device_actions.md - the physical ON/mode/target actions are generated the moment
+STARTING is entered) and remains commanded on throughout STOPPING (specs/12_controller_
+protection_workflow.md §3 - the controlled device is never told to stop until IDLE is
+actually reached). A protection mechanism that keeps the device on (Minimum Runtime,
+Shutdown Delay) must never freeze the regulation controlling that same device.
 
-- the Climate Device is the active heating source;
-- or the thermostat is actively cooling using the Climate Device;
+For Cooling (always performed by the Climate Device), Climate Regulation is considered
+active when the thermostat is in the STARTING, COOLING, or STOPPING Thermostat State.
 
-and the thermostat is in the HEATING or COOLING Thermostat State.
+For Heating via the Climate Device, Climate Regulation is considered active only when
+the thermostat is in the HEATING Thermostat State - unlike Cooling, this is unchanged
+from the original activation condition.
 
 Climate Regulation is inactive - and the scheduler shall not be running - when:
 
 - thermostat OFF;
 - thermostat IDLE;
-- thermostat STARTING;
-- thermostat STOPPING;
-- Boiler is the active heating source.
+- Boiler is the active heating source;
+- the thermostat is STARTING or STOPPING for a Heating episode using the Climate Device
+  (this asymmetry with Cooling is intentional and scoped to Heating only - see above).
+
+Once the Climate Device is actually turned off (STOPPING → IDLE completes), Climate
+Regulation stops immediately, regardless of which operation was active.
 
 This activation decision is still made by the Thermostat Controller, on every
 event-driven evaluation (§5.1), exactly as before. It is a passive observation exposed
@@ -240,9 +251,55 @@ Typical examples include:
 - HVAC OFF;
 - transition from Climate Device to Boiler;
 - transition from Heating to Cooling;
-- transition from Cooling to Heating.
+- transition from Cooling to Heating;
+- the controlled device fully stops (STOPPING → IDLE or STARTING → IDLE).
 
 The controller shall never be reset while continuous regulation is still active.
+
+## 10.1 STARTING/STOPPING vs. IDLE
+
+STARTING and STOPPING belong to the same regulation episode as the HEATING/COOLING they
+surround - the demand that caused them has not necessarily gone away, and the
+controller's state (`I_prev`, `Desat_prev`) shall never be reset merely because the
+Thermostat State is STARTING or STOPPING.
+
+For Heating via the Climate Device, Climate Regulation remains inactive during STARTING
+and STOPPING (§6): STARTING and STOPPING are momentary pauses during which the
+mathematical controller simply does not execute, and `I_prev`/`Desat_prev` are preserved
+unchanged (there is nothing to evolve).
+
+For Cooling, Climate Regulation remains active during STARTING and STOPPING (§6): the
+mathematical controller continues executing on every scheduled tick, adapting the
+Climate Device target to the current room temperature/error for as long as the Climate
+Device remains physically on - including the entire Minimum Runtime / Shutdown Delay
+window. `I_prev`/`Desat_prev` continue evolving exactly as during any other sampling
+interval; they are not frozen, and they are not reset merely because the state is
+STARTING or STOPPING.
+
+The STOPPING → IDLE and STARTING → IDLE transitions are different in both cases: both
+mark the point where the controlled device has fully stopped (in the STARTING → IDLE
+case, a cancelled startup) and thermal demand has been absent long enough for every
+Protection Rule governing shutdown to be satisfied. Whatever regulation happens next -
+even if it is the same operation (Heating or Cooling) using the same heating source - is
+a new, independent regulation episode. It shall never inherit integral state from an
+episode that already completed.
+
+For Heating via the Climate Device, the mathematical controller never executed during a
+STARTING episode that is later cancelled (Climate Regulation was inactive throughout), so
+resetting its state at STARTING → IDLE is a no-op in practice, performed only for
+consistency with STOPPING → IDLE. For Cooling, the mathematical controller may well have
+executed real iterations during that same STARTING or STOPPING window, so this reset is
+not a no-op - it is what correctly prevents the next, independent Cooling episode from
+inheriting integral state accumulated against a since-abandoned reference.
+
+The reset shall occur at the moment the STOPPING → IDLE or STARTING → IDLE transition
+completes. This is a
+single, event-driven decision made by the Thermostat Controller as part of its existing
+state-transition handling - it does not execute the mathematical controller, and it does
+not introduce any additional trigger for its execution. The dedicated periodic scheduler
+(§11) remains the only mechanism that ever calls the mathematical controller; resetting
+its state is a separate, unrelated operation performed directly on the Climate Regulation
+runtime state.
 
 ---
 

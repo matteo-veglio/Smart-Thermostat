@@ -212,7 +212,7 @@ Manual target temperatures represent temporary runtime user preferences.
 
 These two concepts shall remain completely independent.
 
-The implementation may persist the Manual target temperatures.
+The implementation may persist the Manual target temperatures. specs/29_restart_recovery.md defines this persistence: Target Mode and the Manual targets are restored, leniently, across a Home Assistant restart.
 
 The implementation shall never overwrite Preset Configuration with Manual target temperatures.
 

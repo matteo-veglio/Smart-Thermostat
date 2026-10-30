@@ -93,6 +93,20 @@ class ClimateControlAlgorithm:
     def last_snapshot(self) -> ControllerDiagnosticsSnapshot | None:
         return self._state.last_snapshot
 
+    @property
+    def pi_state(self) -> tuple[float, float]:
+        # specs/29_restart_recovery.md §3: (i_prev, desat_prev), exposed read-only
+        # exclusively so the Climate Entity can persist them for startup restoration.
+        # Never consulted by evaluate() or reset().
+        return self._state.i_prev, self._state.desat_prev
+
+    def restore_pi_state(self, *, i_prev: float, desat_prev: float) -> None:
+        # specs/29_restart_recovery.md §3: set i_prev/desat_prev directly, bypassing
+        # evaluate()/reset() semantics. Used exclusively once, during startup
+        # restoration, before any evaluation has ever run against this instance.
+        self._state.i_prev = i_prev
+        self._state.desat_prev = desat_prev
+
     def reset(self) -> None:
         # specs/28_climate_control_mathematical_model.md §10 Controller Reset
         self._state.i_prev = 0.0

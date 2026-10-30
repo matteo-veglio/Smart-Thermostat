@@ -107,6 +107,8 @@ The controller maintains the following internal state.
 
 These values shall persist between consecutive controller evaluations.
 
+specs/29_restart_recovery.md defines how these same values continue across a Home Assistant restart, when the regulation episode they belong to is still active: this is restoration of the initial value used the next time the controller evaluates, not a change to the mathematical model itself and not a third value in addition to the two above.
+
 ---
 
 # 8. Heating and Cooling Behaviour

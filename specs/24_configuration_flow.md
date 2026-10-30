@@ -85,9 +85,9 @@ Temperature hysteresis used by the Demand Engine.
 
 ### Shutdown Delay
 
-Minimum time the thermostat remains in STOPPING before requesting the controlled device to stop.
+Minimum time the Climate Device remains active after an automatic (demand-driven) shutdown, before it is actually requested to stop.
 
-Applies only while the Climate Device is the active heating or cooling solution; never applies while the Boiler is the active heating solution (specs/12_controller_protection_workflow.md §3).
+Applies only while the Climate Device is the active heating or cooling solution; never applies while the Boiler is the active heating solution. It also never applies when the user explicitly turns the thermostat off - only an automatic shutdown caused by demand ending may be delayed (specs/12_controller_protection_workflow.md §3, specs/21_external_state_transitions.md §4).
 
 ### Source Change Delay
 
@@ -95,7 +95,7 @@ Minimum delay before changing the active heating source.
 
 ### Minimum Runtime
 
-Minimum operating time of the currently active heating or cooling solution before it may be stopped or replaced by a different heating source.
+Minimum operating time of the Climate Device (air conditioner) before it may be stopped or replaced by a different heating source. Does not apply to the Boiler (specs/12_controller_protection_workflow.md §3/§4).
 
 ---
 

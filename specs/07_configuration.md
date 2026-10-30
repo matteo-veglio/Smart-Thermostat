@@ -273,12 +273,17 @@ Duration
 
 Description
 
-Time the currently operating device remains active after thermal demand disappears.
+Time the Climate Device remains active after an automatic (demand-driven) shutdown,
+before it is actually requested to stop.
 
 This delay applies only while the Climate Device is the active heating or cooling
-solution (Heating via the Climate Device, or Cooling). It never applies while the
+solution (Heating via the Climate Device, or Cooling), and only while the shutdown is
+an automatic consequence of thermal demand disappearing. It never applies while the
 Boiler is the active heating solution - the Boiler stops immediately once thermal
-demand disappears, subject only to Minimum Runtime.
+demand disappears, subject only to Minimum Runtime (which itself never applies to the
+Boiler either - see below). It also never applies when the user explicitly turns the
+thermostat off: an explicit OFF request bypasses Shutdown Delay entirely, regardless of
+which source is active (see specs/21_external_state_transitions.md §4).
 
 Purpose
 
@@ -312,13 +317,21 @@ Duration
 
 Description
 
-Minimum amount of time the currently active heating or cooling solution (Boiler or
-Climate Device) must remain active before it can be stopped or replaced by a
-different heating source.
+Minimum runtime of the Climate Device (air conditioner).
+
+Minimum amount of time the Climate Device must remain active, once it is the active
+heating or cooling solution, before it can be stopped or replaced by a different
+heating source.
+
+This protection exists exclusively for the Climate Device. It never applies while the
+Boiler is the active heating source - the Boiler may be stopped, or replaced by the
+Climate Device, at any time once no other applicable condition blocks it. The Boiler
+does not require this protection because, unlike an air conditioner compressor,
+frequent ON/OFF cycling does not harm it.
 
 Purpose
 
-Protect compressors and boilers from excessive switching.
+Protect the Climate Device's compressor from excessive switching.
 
 ---
 

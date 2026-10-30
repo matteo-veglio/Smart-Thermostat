@@ -81,7 +81,17 @@ class ThermostatController:
             requested_heating_source = self._source_engine.evaluate_source(context)
 
             if requested_heating_source != context.current_heating_source:
-                minimum_runtime_permission = self._protection_engine.evaluate_minimum_runtime(context)
+                # specs/12_controller_protection_workflow.md §4: Minimum Runtime protects
+                # only the Climate Device (air conditioner) against frequent compressor
+                # cycling. The Boiler has no equivalent physical constraint, so replacing
+                # it with a different source is never gated by Minimum Runtime.
+                applies_minimum_runtime = context.current_heating_source == HeatingSource.AIR_CONDITIONER
+
+                minimum_runtime_permission = (
+                    self._protection_engine.evaluate_minimum_runtime(context)
+                    if applies_minimum_runtime
+                    else Permission.ALLOWED
+                )
 
                 if minimum_runtime_permission == Permission.ALLOWED:
                     protection_result = self._protection_engine.evaluate_source_change_delay(context)
@@ -103,19 +113,38 @@ class ThermostatController:
         device_stopped = False
 
         if requested_state != current_state:
-            if current_state == ThermostatState.STOPPING and requested_state == ThermostatState.IDLE:
-                minimum_runtime_permission = self._protection_engine.evaluate_minimum_runtime(context)
+            # specs/12_controller_protection_workflow.md §3: both Minimum Runtime and
+            # Shutdown Delay protect the Climate Device (air conditioner) only. The
+            # Boiler has no equivalent cycling constraint, and radiator-based heating
+            # already has significant thermal inertia, so keeping it running after
+            # demand has ended (or after being told to stop) would only cause
+            # unnecessary overshoot - the Boiler stops immediately once no other
+            # applicable condition blocks it. This branch handles both a completed
+            # shutdown (STOPPING -> IDLE) and a cancelled startup (STARTING -> IDLE) -
+            # the Climate Device may already have been commanded on during STARTING, so
+            # the same protections apply identically regardless of origin.
+            if current_state in (ThermostatState.STOPPING, ThermostatState.STARTING) and (
+                requested_state == ThermostatState.IDLE
+            ):
+                active_source_is_climate_device = context.current_operation == CurrentOperation.COOLING or (
+                    context.current_operation == CurrentOperation.HEATING
+                    and context.current_heating_source == HeatingSource.AIR_CONDITIONER
+                )
+
+                minimum_runtime_permission = (
+                    self._protection_engine.evaluate_minimum_runtime(context)
+                    if active_source_is_climate_device
+                    else Permission.ALLOWED
+                )
 
                 if minimum_runtime_permission == Permission.ALLOWED:
-                    # Shutdown Delay only applies while the Climate Device is the active
-                    # heating/cooling solution. Radiator-based Boiler heating already has
-                    # significant thermal inertia, so keeping it running after demand has
-                    # ended would only cause unnecessary overshoot - the Boiler stops
-                    # immediately once Minimum Runtime is satisfied.
-                    applies_shutdown_delay = context.current_operation == CurrentOperation.COOLING or (
-                        context.current_operation == CurrentOperation.HEATING
-                        and context.current_heating_source == HeatingSource.AIR_CONDITIONER
-                    )
+                    # specs/21_external_state_transitions.md §4: Shutdown Delay only ever
+                    # applies to an *automatic* shutdown (demand ending while the
+                    # thermostat remains enabled). An explicit user OFF request
+                    # (enabled=False) bypasses Shutdown Delay entirely - Minimum Runtime
+                    # remains the only protection that may still delay it, and only for
+                    # the Climate Device.
+                    applies_shutdown_delay = enabled and active_source_is_climate_device
 
                     protection_result = (
                         self._protection_engine.evaluate_shutdown_delay(context)
@@ -149,6 +178,14 @@ class ThermostatController:
                 ):
                     next_evaluation_at = context.now
 
+                # specs/11_controller_transition_table.md §8 / specs/12_controller_protection_workflow.md
+                # §3 STOPPING -> STARTING: if demand returns before the pending shutdown
+                # completes, the shutdown is cancelled. The controlled device was never
+                # actually told to stop (specs/17/§18 device actions only reach the "off"
+                # state once IDLE is reached), so - unlike STOPPING -> IDLE - no protection
+                # check applies here: neither Minimum Runtime nor Shutdown Delay gate a
+                # resumption of an operation that never stopped. This transition is
+                # intentionally immediate and ungated.
                 self._state_machine.transition_to(requested_state)
 
         # specs/21_external_state_transitions.md §4 Disabling the Thermostat
@@ -179,8 +216,16 @@ class ThermostatController:
         # specs/27_climate_control_architecture.md §10 Reset Behaviour
         # Reset only on the specific transitions this document names - never merely
         # because regulation is momentarily paused (STARTING/STOPPING, see below).
+        # `device_stopped` marks the exact instant STOPPING -> IDLE completes: the
+        # controlled device has now fully stopped and any future demand starts a new,
+        # independent regulation episode. Without this, a demand that ends and later
+        # resumes (even with the same operation and the same source) would silently
+        # inherit I_prev/Desat_prev from the episode that already completed - the
+        # STARTING/STOPPING *pause* is momentary and correctly preserves state, but a
+        # full stop all the way to IDLE is not a pause, it is the episode ending.
         climate_regulation_reset_required = (
             not enabled
+            or device_stopped
             or (
                 context.current_operation == CurrentOperation.HEATING
                 and context.current_heating_source == HeatingSource.AIR_CONDITIONER
@@ -200,9 +245,25 @@ class ThermostatController:
         )
 
         # specs/27_climate_control_architecture.md §6 Activation Conditions
-        regulation_active = uses_climate_device and effective_state in (
-            ThermostatState.HEATING,
-            ThermostatState.COOLING,
+        # Climate Regulation tracks whether the Climate Device is physically active, not
+        # merely whether the logical Thermostat State is HEATING/COOLING. For Cooling,
+        # the Climate Device is already commanded on during STARTING (the physical ON/
+        # mode/target actions are generated the moment STARTING is entered - see
+        # _generate_device_actions) and remains commanded on throughout STOPPING (the
+        # controlled device is never told to stop until IDLE is actually reached - see
+        # specs/12_controller_protection_workflow.md §3). Regulation must therefore stay
+        # active across both, so the PI keeps adapting the Climate Device target to the
+        # current room temperature/error for as long as the device is genuinely on -
+        # including the entire Minimum Runtime / Shutdown Delay window - and only stops
+        # once the device is actually turned off (STOPPING -> IDLE completes). Heating's
+        # own condition is deliberately left unchanged: this widening applies only when
+        # the requested operation is COOLING.
+        regulation_active = uses_climate_device and (
+            effective_state in (ThermostatState.HEATING, ThermostatState.COOLING)
+            or (
+                requested_operation == CurrentOperation.COOLING
+                and effective_state in (ThermostatState.STARTING, ThermostatState.STOPPING)
+            )
         )
 
         # Control Diagnostics: a passive observation of this cycle's activation
@@ -260,7 +321,16 @@ class ThermostatController:
             return CurrentOperation.NONE
 
         if effective_state == ThermostatState.STARTING:
-            return CurrentOperation.HEATING if demand == Demand.HEATING else CurrentOperation.COOLING
+            if demand == Demand.HEATING:
+                return CurrentOperation.HEATING
+
+            if demand == Demand.COOLING:
+                return CurrentOperation.COOLING
+
+            # NO_DEMAND while still STARTING (e.g. Minimum Runtime denying STARTING ->
+            # IDLE): preserve the operation actually in progress instead of defaulting to
+            # COOLING - mirrors the STOPPING branch immediately below.
+            return context.current_operation
 
         if effective_state == ThermostatState.HEATING:
             return CurrentOperation.HEATING
@@ -364,13 +434,40 @@ class ThermostatController:
         # specs/15_runtime_state_update_rules.md §5 Demand Ended At
         if current_state in (ThermostatState.HEATING, ThermostatState.COOLING) and demand == Demand.NO_DEMAND:
             self._runtime_state.demand_ended_at = context.now
+        elif (
+            current_state == ThermostatState.STARTING
+            and demand == Demand.NO_DEMAND
+            and context.demand_ended_at == 0.0
+        ):
+            # Write-once, guarded on the existing "0.0 means unset" sentinel: unlike
+            # HEATING/COOLING (which always transition away from themselves the instant
+            # NO_DEMAND is observed), STARTING can remain STARTING across many
+            # consecutive NO_DEMAND evaluations while Minimum Runtime denies STARTING ->
+            # IDLE. Without this guard the timestamp would be pushed forward every cycle
+            # and Shutdown Delay would never elapse.
+            self._runtime_state.demand_ended_at = context.now
         elif requested_state == ThermostatState.STARTING:
             self._runtime_state.demand_ended_at = 0.0
 
         # specs/15_runtime_state_update_rules.md §4 Device Started At
-        if current_state == ThermostatState.STARTING and requested_state in (
-            ThermostatState.HEATING,
-            ThermostatState.COOLING,
+        # The physical ON command is issued the instant IDLE -> STARTING is entered
+        # (_generate_device_actions), not at STARTING -> HEATING/COOLING confirmation, so
+        # the episode's runtime timer must be anchored there for Minimum Runtime to
+        # measure the actual physical start.
+        # specs/12_controller_protection_workflow.md §3 STOPPING -> STARTING: a cancelled
+        # shutdown (STOPPING -> STARTING -> HEATING/COOLING) must never look like a fresh
+        # physical start - the device was never told to stop, so its original start time
+        # must be preserved. `context.device_started_at` is only ever 0.0 immediately
+        # after a real stop (STOPPING -> IDLE / STARTING -> IDLE) or before the very
+        # first start; guarding on it distinguishes a genuine start (resets the timer)
+        # from a resumed one (leaves the original timer untouched), without requiring any
+        # new state or execution path.
+        if current_state == ThermostatState.IDLE and requested_state == ThermostatState.STARTING:
+            self._runtime_state.device_started_at = context.now
+        elif (
+            current_state == ThermostatState.STARTING
+            and requested_state in (ThermostatState.HEATING, ThermostatState.COOLING)
+            and context.device_started_at == 0.0
         ):
             self._runtime_state.device_started_at = context.now
         elif device_stopped:

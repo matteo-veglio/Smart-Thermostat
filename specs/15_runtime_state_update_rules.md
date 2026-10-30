@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Update Rules
 
-Version: 1.2
+Version: 1.3
 
 Status: Frozen
 
@@ -104,13 +104,27 @@ Update the timestamp when:
 
 The value SHALL be the current monotonic time.
 
+A device becomes active the instant the corresponding Requested Device Action (Turn
+Boiler On / Turn Climate On, specs/17_requested_device_actions.md) is generated - which
+happens when the thermostat enters STARTING (IDLE → STARTING), not when STARTING is
+later confirmed into HEATING/COOLING. The timestamp SHALL therefore be established at
+IDLE → STARTING. The pre-existing update at STARTING → HEATING/COOLING confirmation
+remains as a defensive fallback and SHALL NOT overwrite a value already established at
+IDLE → STARTING.
+
+specs/12_controller_protection_workflow.md §3 STOPPING → STARTING: a cancelled shutdown
+(STOPPING → STARTING → HEATING/COOLING) SHALL NOT update this timestamp - the device was
+never told to stop, so its original start time remains valid and unchanged.
+
 ## Preserve
 
-Preserve the timestamp while the same device continues operating.
+Preserve the timestamp while the same device continues operating, including while
+STARTING or STOPPING momentarily pause it.
 
 ## Reset
 
-Reset the timestamp when no heating or cooling device remains active.
+Reset the timestamp when no heating or cooling device remains active - this includes
+both a completed shutdown (STOPPING → IDLE) and a cancelled startup (STARTING → IDLE).
 
 ---
 
@@ -124,9 +138,18 @@ Update the timestamp when thermal demand changes from an active demand to NO_DEM
 
 The value SHALL be the current monotonic time.
 
+This also applies while the thermostat is STARTING: if demand disappears before
+STARTING is confirmed into HEATING/COOLING, the timestamp SHALL be established at that
+point. This update SHALL occur only once per occurrence - it SHALL NOT be re-stamped on
+every subsequent evaluation for as long as the thermostat remains STARTING with demand
+still absent (for example while Minimum Runtime is denying the STARTING → IDLE
+transition). Re-stamping it on every such evaluation would prevent Shutdown Delay from
+ever accumulating enough elapsed time to be satisfied.
+
 ## Preserve
 
-Preserve the timestamp while thermal demand remains absent.
+Preserve the timestamp while thermal demand remains absent, including while STARTING is
+waiting for Minimum Runtime to be satisfied before completing STARTING → IDLE.
 
 ## Reset
 

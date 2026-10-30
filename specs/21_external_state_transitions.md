@@ -2,7 +2,7 @@
 
 ## External State Transitions
 
-Version: 1.0
+Version: 1.1
 
 Status: Frozen
 
@@ -65,7 +65,17 @@ The Thermostat Controller SHALL determine how to reach OFF according to the norm
 
 If the thermostat is already IDLE, the transition to OFF may occur immediately.
 
-If the thermostat is STARTING, HEATING, COOLING or STOPPING, the controller SHALL respect every protection rule before reaching OFF.
+If the thermostat is STARTING, HEATING, COOLING or STOPPING, the controller SHALL
+respect the protection rules that apply to an explicit user OFF request before reaching
+OFF. This is a distinct, narrower set of protections than the ones applied to an
+automatic shutdown caused by demand ending (specs/12_controller_protection_workflow.md
+§ "USER-REQUESTED OFF vs AUTOMATIC DEMAND TERMINATION"):
+
+- Shutdown Delay SHALL NEVER apply to an explicit user OFF request, regardless of which
+  source is active.
+- Minimum Runtime MAY still apply, and only while the Climate Device is the active
+  heating or cooling solution. It never applies while the Boiler is the active heating
+  source.
 
 The Climate Entity SHALL NOT bypass the Thermostat Controller.
 

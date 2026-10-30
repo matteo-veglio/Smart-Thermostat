@@ -2,7 +2,7 @@
 
 ## State Machine
 
-Version: 2.0
+Version: 2.3
 
 Status: Frozen
 
@@ -68,12 +68,28 @@ The following transitions are allowed.
 | STARTING | HEATING |
 | STARTING | COOLING |
 | STARTING | OFF |
+| STARTING | IDLE |
 | HEATING | STOPPING |
 | COOLING | STOPPING |
 | STOPPING | IDLE |
 | STOPPING | OFF |
+| STOPPING | STARTING |
 
 Any transition not listed above shall be rejected.
+
+STOPPING represents a shutdown that has been decided but not yet executed - the
+controlled device remains physically active for as long as the thermostat stays in
+STOPPING (see specs/11_controller_transition_table.md §8 and
+specs/12_controller_protection_workflow.md §3). If demand returns before the shutdown
+completes, the pending shutdown is cancelled and the thermostat resumes through
+STARTING rather than waiting for IDLE.
+
+STARTING → IDLE represents a cancelled startup: if the demand that caused STARTING
+disappears before HEATING/COOLING is confirmed, the requested state becomes IDLE
+(specs/11_controller_transition_table.md §7). Unlike STOPPING, the controlled device may
+already have been commanded on during STARTING (see specs/12_controller_protection_
+workflow.md §3), so this transition is subject to the same protection model as
+STOPPING → IDLE rather than being immediate and ungated.
 
 ---
 
@@ -93,7 +109,9 @@ The current state shall be stored internally by the State Machine.
 
 No persistence to Home Assistant is performed by this component.
 
-Persistence across Home Assistant restarts is the responsibility of higher-level components.
+Persistence across Home Assistant restarts is the responsibility of higher-level components. specs/29_restart_recovery.md defines this responsibility completely: the Climate Entity, using Home Assistant's native `RestoreEntity` mechanism, restores a previously-persisted state as the State Machine's initial state before any evaluation runs.
+
+This restoration is performed through `StateMachine.restore_state()`, a method distinct from `transition_to()`. It exists exclusively for this startup use, sets the current state directly, and deliberately bypasses the transition validation defined in §4 - restoring a prior process's last state is not itself a demand-driven transition. `restore_state()` shall never be called after the first evaluation has run, and shall never be used as a substitute for `transition_to()` during normal operation.
 
 ---
 

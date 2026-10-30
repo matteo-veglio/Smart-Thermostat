@@ -28,6 +28,10 @@
           "shutdown_delay": "Shutdown Delay",
           "source_change_delay": "Source Change Delay",
           "minimum_runtime": "Minimum Runtime"
+        },
+        "data_description": {
+          "shutdown_delay": "Climate Device (air conditioner) only. Time it stays active after an automatic shutdown, before actually being stopped. Never applies to the Boiler, and never applies when the thermostat is explicitly turned off.",
+          "minimum_runtime": "Climate Device (air conditioner) only. Minimum time it must run before it can be stopped or replaced by the other heating source. Never applies to the Boiler."
         }
       },
       "climate_regulation": {
@@ -104,6 +108,10 @@
           "shutdown_delay": "Shutdown Delay",
           "source_change_delay": "Source Change Delay",
           "minimum_runtime": "Minimum Runtime"
+        },
+        "data_description": {
+          "shutdown_delay": "Climate Device (air conditioner) only. Time it stays active after an automatic shutdown, before actually being stopped. Never applies to the Boiler, and never applies when the thermostat is explicitly turned off.",
+          "minimum_runtime": "Climate Device (air conditioner) only. Minimum time it must run before it can be stopped or replaced by the other heating source. Never applies to the Boiler."
         }
       },
       "climate_regulation": {

@@ -33,7 +33,10 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
+from homeassistant.util import dt as dt_util
 
+from . import restore_data
 from .boiler_controller import BoilerController
 from .climate_controller import ClimateController
 from .config_flow import (
@@ -119,7 +122,7 @@ async def async_setup_entry(
     )
 
 
-class SmartThermostatClimateEntity(ClimateEntity):
+class SmartThermostatClimateEntity(RestoreEntity, ClimateEntity):
     # HVAC
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT_COOL]
 
@@ -223,6 +226,13 @@ class SmartThermostatClimateEntity(ClimateEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
 
+        # specs/29_restart_recovery.md: restore user intent and, where the persisted
+        # data validates, the previous regulation episode's logical/PI state before
+        # the first evaluation ever runs - so a Home Assistant restart is never
+        # interpreted as the user requesting OFF, and a continuing regulation episode
+        # is never treated as a fresh one.
+        await self._async_restore_previous_state()
+
         self.async_on_remove(self._cancel_scheduled_evaluation)
         self.async_on_remove(self._stop_climate_regulation_scheduler)
 
@@ -243,6 +253,89 @@ class SmartThermostatClimateEntity(ClimateEntity):
         )
 
         await self.async_evaluate(reason="entity startup")
+
+    async def _async_restore_previous_state(self) -> None:
+        # specs/29_restart_recovery.md §2 User Intent / §4 Safe Failure Behaviour:
+        # HVAC mode is the authoritative signal of user intent. An unrecognised or
+        # missing previous state falls back to OFF - it never invents an operating
+        # mode. This never affects a normal, already-running user-driven HVAC mode
+        # change (async_set_hvac_mode) - it only ever sets the INITIAL value read by
+        # the very first "entity startup" evaluation below.
+        last_state = await self.async_get_last_state()
+
+        if last_state is not None and last_state.state in (HVACMode.OFF, HVACMode.HEAT_COOL):
+            self._attr_hvac_mode = HVACMode(last_state.state)
+        else:
+            self._attr_hvac_mode = HVACMode.OFF
+
+        last_extra_data = await self.async_get_last_extra_data()
+        raw = last_extra_data.as_dict() if last_extra_data is not None else None
+
+        # specs/29 §2: lenient, field-by-field restoration - never blocks on the
+        # Runtime/PI Bundle below, and never invalidates the other fields here.
+        user_intent = restore_data.parse_user_intent(raw)
+
+        if user_intent is not None:
+            if user_intent.target_mode is not None:
+                self._target_mode = user_intent.target_mode
+            if user_intent.preset_mode is not None and user_intent.preset_mode in self._attr_preset_modes:
+                self._attr_preset_mode = user_intent.preset_mode
+            if user_intent.manual_heating_target is not None:
+                self._manual_heating_target = user_intent.manual_heating_target
+            if user_intent.manual_cooling_target is not None:
+                self._manual_cooling_target = user_intent.manual_cooling_target
+
+        # specs/29 §3: atomic, all-or-nothing restoration of the logical controller
+        # state and the PI state it belongs to. Deliberately NOT restored here: any
+        # physical device state (specs/29 §5) - that always comes from the live HA
+        # entities on the very next evaluate() call, exactly as on every other cycle.
+        runtime_bundle = restore_data.parse_runtime_bundle(
+            raw, mono_now=time.monotonic(), wall_now=dt_util.utcnow()
+        )
+
+        if runtime_bundle is not None:
+            self._state_machine.restore_state(runtime_bundle.thermostat_state)
+
+            runtime_state = self._runtime_data.runtime_state
+            runtime_state.current_operation = runtime_bundle.current_operation
+            runtime_state.current_heating_source = runtime_bundle.current_heating_source
+            runtime_state.device_started_at = runtime_bundle.device_started_at
+            runtime_state.demand_ended_at = runtime_bundle.demand_ended_at
+            runtime_state.source_selected_at = runtime_bundle.source_selected_at
+            runtime_state.desired_source_differs_since = runtime_bundle.desired_source_differs_since
+
+            self._runtime_data.climate_control_algorithm.restore_pi_state(
+                i_prev=runtime_bundle.i_prev, desat_prev=runtime_bundle.desat_prev
+            )
+        # else: leave the fresh defaults already established by async_setup_entry()
+        # untouched - specs/29 §4 Safe Failure Behaviour ("behave like a fresh
+        # installation").
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        # specs/29_restart_recovery.md §2/§3: always reflects whatever the Runtime
+        # State/PI state hold at the moment Home Assistant asks to snapshot this
+        # entity - never computed from a cache, never delayed.
+        runtime_state = self._runtime_data.runtime_state
+        i_prev, desat_prev = self._runtime_data.climate_control_algorithm.pi_state
+
+        return restore_data.build_extra_stored_data(
+            target_mode=self._target_mode,
+            preset_mode=self._attr_preset_mode,
+            manual_heating_target=self._manual_heating_target,
+            manual_cooling_target=self._manual_cooling_target,
+            thermostat_state=self._state_machine.current_state,
+            current_operation=runtime_state.current_operation,
+            current_heating_source=runtime_state.current_heating_source,
+            device_started_at=runtime_state.device_started_at,
+            demand_ended_at=runtime_state.demand_ended_at,
+            source_selected_at=runtime_state.source_selected_at,
+            desired_source_differs_since=runtime_state.desired_source_differs_since,
+            i_prev=i_prev,
+            desat_prev=desat_prev,
+            mono_now=time.monotonic(),
+            wall_now=dt_util.utcnow(),
+        )
 
     async def _async_handle_tracked_state_change(self, event: Event[EventStateChangedData]) -> None:
         entity_id = event.data["entity_id"]

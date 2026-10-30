@@ -2,7 +2,7 @@
 
 ## Thermostat Runtime State Management
 
-Version: 1.2
+Version: 1.3
 
 Status: Frozen
 
@@ -30,6 +30,8 @@ The instance SHALL be created during:
 
 The instance SHALL be initialized with its default values.
 
+specs/29_restart_recovery.md defines an exception to this: once the Climate Entity is added to Home Assistant, its own restart-recovery step MAY overwrite the freshly-defaulted instance's fields with previously-persisted values, before the first evaluation ever runs. This is not a modification performed during normal operation - it happens exactly once, before any Thermostat Controller evaluation has occurred against this instance, and only when the persisted data validates according to specs/29_restart_recovery.md §3. When it does not validate, the instance keeps its default values exactly as described above.
+
 The same instance SHALL be reused throughout the lifetime of the integration.
 
 ---
@@ -53,9 +55,9 @@ The integration never modifies its contents.
 
 # 4. Modification Ownership
 
-The Thermostat Controller is the only component authorized to modify the Thermostat Runtime State.
+During normal operation - every evaluation cycle after the Climate Entity has been added to Home Assistant - the Thermostat Controller is the only component authorized to modify the Thermostat Runtime State.
 
-No other component may update its contents.
+No other component may update its contents during normal operation.
 
 This includes every persistent runtime field, including:
 
@@ -66,7 +68,7 @@ This includes every persistent runtime field, including:
 - Source Selected At;
 - Desired Source Differs Since.
 
-In particular:
+In particular, during normal operation:
 
 - Runtime Context Factory: read-only
 - Climate Entity: read-only
@@ -77,6 +79,8 @@ In particular:
 The Thermostat Controller SHALL apply updates according to:
 
 - specs/15_runtime_state_update_rules.md
+
+specs/29_restart_recovery.md defines the single exception to this exclusivity: during Climate Entity startup, before the first Thermostat Controller evaluation has ever run against this instance, the Climate Entity's restart-recovery step MAY set the Thermostat Runtime State's fields directly from validated persisted data. This is restoration of the instance's initial values, not a modification performed during normal operation, and it never occurs after the first evaluation has run.
 
 ---
 
@@ -129,7 +133,9 @@ During:
 
 the integration releases the Thermostat Runtime State instance together with all other runtime objects.
 
-No runtime information survives integration unloading.
+No runtime information survives integration unloading *as an in-memory object*.
+
+This does not preclude the Climate Entity from having separately persisted a representation of that information beforehand, through Home Assistant's native `RestoreEntity` mechanism, for the sole purpose of restoring a new instance's initial values on the next startup (specs/29_restart_recovery.md). That persisted representation is not the Thermostat Runtime State instance itself, is never read by anything during normal operation, and only ever influences the initial values of the next instance created by a subsequent `async_setup_entry()` call.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Thermostat Controller Transition Table
 
-Version: 1.1
+Version: 1.2
 
 Status: Frozen
 
@@ -154,11 +154,17 @@ The shutdown may include:
 - completion of shutdown delays;
 - any other actions required before returning to the idle state.
 
-During STOPPING the thermostat has already decided to stop heating or cooling, but the operating mode is not yet considered completed.
+During STOPPING the thermostat has already decided to stop heating or cooling, but the operating mode is not yet considered completed. The controlled device remains physically active throughout STOPPING - it is only ever requested to actually stop once IDLE is reached (specs/12_controller_protection_workflow.md §3).
 
 If a new demand appears during STOPPING, the requested state becomes STARTING.
 
-Whether that transition is immediately allowed is determined exclusively by the Protection Engine.
+This is a legal transition of the State Machine (specs/04_state_machine.md §4).
+
+Because the device was never actually told to stop, STOPPING → STARTING represents a
+cancelled shutdown rather than a physical restart: it is evaluated immediately, without
+any Protection Engine check, and it never resets the device's runtime timers as though a
+real stop and start had occurred. specs/12_controller_protection_workflow.md §3 defines
+this explicitly.
 
 ---
 
